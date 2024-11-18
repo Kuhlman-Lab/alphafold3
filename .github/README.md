@@ -14,10 +14,10 @@
 `https://github.com/Kuhlman-Lab/alphafold3.git`
 
 3. Install AF3 Python dependencies:
-`pip3 install -r alphafold3/alphafold3/dev-requirements.txt`
+`pip3 install -r dev-requirements.txt`
 
 4. Install the AF3 source code (need GNU g++ >= 9.4):
-`pip3 install --no-deps alphafold3/alphafold3/`
+`pip3 install --no-deps .`
 
 5. Run `build_data` (this was created in step 4):
 `build_data`
