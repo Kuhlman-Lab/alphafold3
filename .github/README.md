@@ -13,11 +13,14 @@
 3. Clone this GitHub repository:
 `https://github.com/Kuhlman-Lab/alphafold3.git`
 
-3. Install AF3 Python dependencies:
+4. Install AF3 Python dependencies:
 `pip3 install -r dev-requirements.txt`
 
-4. Install the AF3 source code (need GNU g++ >= 9.4):
+5. Install the AF3 source code (need GNU g++ >= 9.4):
 `pip3 install --no-deps .`
 
-5. Run `build_data` (this was created in step 4):
+6. Run `build_data` (this was created in step 4):
 `build_data`
+
+7. Install CUDA Toolkit 12.6:
+`conda install -c nvidia cuda-toolkit=12.6`
