@@ -9,7 +9,7 @@ from alphafold3.common.folding_input import Input, check_unique_sanitised_names
 
 DEFAULT_MODEL_DIR = os.path.join(
     os.path.dirname(__file__),
-    "..", ".."
+    "..", "models"
 )
 
 
