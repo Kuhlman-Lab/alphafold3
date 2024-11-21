@@ -42,7 +42,7 @@ from af3_utils import (
 
 
 _HOME_DIR = pathlib.Path(os.environ.get('HOME'))
-DEFAULT_DB_DIR = _HOME_DIR / 'public_databases'
+_DEFAULT_DB_DIR = _HOME_DIR / 'public_databases'
 
 
 # Binary paths.
@@ -73,9 +73,9 @@ _HMMBUILD_BINARY_PATH = flags.DEFINE_string(
 )
 
 # Database paths.
-_DB_DIR = flags.DEFINE_multi_string(
+DB_DIR = flags.DEFINE_multi_string(
     'db_dir',
-    (DEFAULT_DB_DIR.as_posix(),),
+    (_DEFAULT_DB_DIR.as_posix(),),
     'Path to the directory containing the databases. Can be specified multiple'
     ' times to search multiple directories in order.',
 )
@@ -552,7 +552,7 @@ def main(args_dict: Dict[str, Any]) -> None:
 
     if args_dict["run_data_pipeline"]:
         # TODO: I think we can skip this since we plan on using ColabFold MMseqs2 server?
-        expand_path = lambda x: replace_db_dir(x, _DB_DIR.value)
+        expand_path = lambda x: replace_db_dir(x, DB_DIR.value)
         data_pipeline_config = pipeline.DataPipelineConfig(
             jackhmmer_binary_path=_JACKHMMER_BINARY_PATH.value,
             nhmmer_binary_path=_NHMMER_BINARY_PATH.value,
