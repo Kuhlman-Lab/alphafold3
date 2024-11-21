@@ -46,6 +46,11 @@ def binary_to_bool(i: int) -> bool:
     return True if i else False
 
 
+def set_if_absent(d: Dict[str, Any], key: str, default_value: Any) -> None:
+    if key not in d:
+        d[key] = default_value
+
+
 def get_af3_args() -> Dict[str, Any]:
     """Creates a parser for AF3 and returns a dictionary of the parsed args.
 
@@ -160,19 +165,17 @@ def set_json_defaults(json_str: str) -> str:
         pass
     else:
         # These defaults may need changed with future AF3 updates.
-        if 'dialect' not in raw_json:
-            raw_json['dialect'] = 'alphafold3'
-        if 'version' not in raw_json:
-            raw_json['version'] = 1
+        set_if_absent(raw_json, 'dialect', 'alphafold3')
+        set_if_absent(raw_json, 'version', 1)
         
         # Set default values for empty MSAs and templates
         for sequence in raw_json['sequences']:
             if "protein" in sequence:
-                sequence['protein']['unpairedMsa'] = ''
-                sequence['protein']['pairedMsa'] = ''
-                sequence['protein']['templates'] = []
+                set_if_absent(sequence['protein'], 'unpairedMsa', '')
+                set_if_absent(sequence['protein'], 'pairedMsa', '')
+                set_if_absent(sequence['protein'], 'templates', [])
             elif 'rna' in sequence:
-                sequence['rna']['unpairedMsa'] = ''
+                set_if_absent(sequence['rna'], 'unpairedMsa', '')
                 
         # Convert the dictionary back to a str
         json_str = json.dumps(raw_json)
