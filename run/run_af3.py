@@ -508,11 +508,13 @@ def main(args_dict: Dict[str, Any]) -> None:
 
     if args_dict["input_dir"] is not None:
         fold_inputs = load_fold_inputs_from_dir(
-            pathlib.Path(args_dict["input_dir"])
+            pathlib.Path(args_dict["input_dir"]),
+            run_mmseqs=args_dict["run_mmseqs"]
         )
     elif args_dict["json_path"] is not None:
         fold_inputs = load_fold_inputs_from_path(
-            pathlib.Path(args_dict["json_path"])
+            pathlib.Path(args_dict["json_path"]),
+            run_mmseqs=args_dict["run_mmseqs"]
         )
     else:
         raise AssertionError(
@@ -551,7 +553,8 @@ def main(args_dict: Dict[str, Any]) -> None:
     print('\n'.join(notice))
 
     if args_dict["run_data_pipeline"]:
-        # TODO: I think we can skip this since we plan on using ColabFold MMseqs2 server?
+        # We skip this (by setting run_data_pipeline=False) since we handle MSAs
+        # and templates differently.
         expand_path = lambda x: replace_db_dir(x, DB_DIR.value)
         data_pipeline_config = pipeline.DataPipelineConfig(
             jackhmmer_binary_path=_JACKHMMER_BINARY_PATH.value,
