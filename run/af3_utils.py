@@ -112,6 +112,14 @@ def get_af3_args() -> Dict[str, Any]:
         "(True)."
     )
     
+    # MMseqs for protein chains.
+    parser.add_argument(
+        "--run_mmseqs",
+        action="store_true",
+        help="If provided, MMseqs2 will be used to generate MSAs and "
+        "templates for protein queries that have no custom inputs specified."
+    )
+    
     # Compilation arguments.
     parser.add_argument(
         "--jax_compilation_cache_dir",
@@ -176,7 +184,7 @@ def set_json_defaults(json_str: str) -> str:
     return json_str
 
 
-def load_fold_inputs_from_path(json_path: pathlib.Path) -> Sequence[Input]:
+def load_fold_inputs_from_path(json_path: pathlib.Path, run_mmseqs: bool = False) -> Sequence[Input]:
     """Loads multiple fold inputs from a JSON path."""
     # Update the json defaults before parsing it.
     with open(json_path, 'r') as f:
@@ -203,7 +211,7 @@ def load_fold_inputs_from_path(json_path: pathlib.Path) -> Sequence[Input]:
     return fold_inputs
 
 
-def load_fold_inputs_from_dir(input_dir: pathlib.Path) -> Sequence[Input]:
+def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False) -> Sequence[Input]:
     """Loads multiple fold inputs from all JSON files in a given input_dir.
 
     Args:
