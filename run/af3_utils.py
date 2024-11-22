@@ -105,13 +105,6 @@ def get_af3_args() -> Dict[str, Any]:
     
     # Control which stages to run.
     parser.add_argument(
-        "--run_data_pipeline",
-        type=int,
-        default=1,
-        help="Whether to run the data pipeline on the fold inputs. Defaults to"
-        " 1 (True)."
-    )
-    parser.add_argument(
         "--run_inference",
         type=int,
         default=1,
@@ -140,9 +133,9 @@ def get_af3_args() -> Dict[str, Any]:
     args = parser.parse_args()
     
     # Reformat some of the arguments
-    args.run_data_pipeline = binary_to_bool(args.run_data_pipeline)
     args.run_inference = binary_to_bool(args.run_inference)
     args.buckets = sorted([int(b) for b in args.buckets.split(',')])
+    args.run_data_pipeline = False # Kuhlman Lab installation handles MSAs and templates differently
     
     return vars(args)
 
