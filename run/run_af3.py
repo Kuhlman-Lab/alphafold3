@@ -506,27 +506,29 @@ def main(args_dict: Dict[str, Any]) -> None:
             ' set to true.'
         )
 
-    if args_dict["input_dir"] is not None:
-        fold_inputs = load_fold_inputs_from_dir(
-            pathlib.Path(args_dict["input_dir"]),
-            run_mmseqs=args_dict["run_mmseqs"]
-        )
-    elif args_dict["json_path"] is not None:
-        fold_inputs = load_fold_inputs_from_path(
-            pathlib.Path(args_dict["json_path"]),
-            run_mmseqs=args_dict["run_mmseqs"]
-        )
-    else:
-        raise AssertionError(
-            'Exactly one of --json_path or --input_dir must be specified.'
-        )
-
     # Make sure we can create the output directory before running anything.
     try:
       os.makedirs(args_dict["output_dir"], exist_ok=True)
     except OSError as e:
       print(f'Failed to create output directory {args_dict["output_dir"]}: {e}')
       raise
+
+    if args_dict["input_dir"] is not None:
+        fold_inputs = load_fold_inputs_from_dir(
+            pathlib.Path(args_dict["input_dir"]),
+            run_mmseqs=args_dict["run_mmseqs"],
+            output_dir=args_dict["output_dir"]
+        )
+    elif args_dict["json_path"] is not None:
+        fold_inputs = load_fold_inputs_from_path(
+            pathlib.Path(args_dict["json_path"]),
+            run_mmseqs=args_dict["run_mmseqs"],
+            output_dir=args_dict["output_dir"]
+        )
+    else:
+        raise AssertionError(
+            'Exactly one of --json_path or --input_dir must be specified.'
+        )
 
     if args_dict["run_inference"]:
         # Fail early on incompatible devices, but only if we're running inference.
