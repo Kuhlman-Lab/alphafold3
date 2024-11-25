@@ -188,7 +188,7 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                     # If we don't have unpairedMsa and templates and we want them, then use MMseqs
                     # to generate them
                     a3m_path, template_dir = run_mmseqs2(
-                        os.path.join(output_dir, 'mmseqs'),
+                        os.path.join(output_dir, f'mmseqs_{sequence["protein"]["id"][0]}'),
                         sequence['protein']['sequence'],
                         use_templates=True
                     )
