@@ -1,0 +1,34 @@
+{
+    "name": "2PV7",
+    "sequences": [
+      {
+        "protein": {
+          "id": ["A", "B"],
+          "sequence": "GMRESYANENQFGFKTINSDIHKIVIVGGYGKLGGLFARYLRASGYPISILDREDWAVAESILANADVVIVSVPINLTLETIERLKPYLTENMLLADLTSVKREPLAKMLEVHTGAVLGLHPMFGADIASMAKQVVVRCDGRFPERYEWLLEQIQIWGAKIYQTNATEHDHNMTYIQALRHFSTFANGLHLSKQPINLANLLALSSPIYRLELAMIGRLFAQDAELYADIIMDKSENLAVIETLKQTYDEALTFFENNDRQGFIDAFHKVRDWFGDYSEQFLKESRQLLQQANDLKQG",
+          "modifications": [
+            {"ptmType": "MSE", "ptmPosition": 2},
+            {"ptmType": "MSE", "ptmPosition": 93},
+            {"ptmType": "MSE", "ptmPosition": 109},
+            {"ptmType": "MSE", "ptmPosition": 123},
+            {"ptmType": "MSE", "ptmPosition": 131},
+            {"ptmType": "MSE", "ptmPosition": 173},
+            {"ptmType": "MSE", "ptmPosition": 215},
+            {"ptmType": "MSE", "ptmPosition": 232}
+          ]
+        }
+      },
+      {
+        "ligand": {
+          "id": ["C", "D"],
+          "ccdCodes": ["NAD"]
+        }
+      },
+      {
+        "ligand": {
+          "id": ["E", "F"],
+          "ccdCodes": ["TYR"]
+        }
+      }
+    ],
+    "modelSeeds": [1]
+  }
