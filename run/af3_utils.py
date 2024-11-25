@@ -590,7 +590,6 @@ def get_custom_template_hits(
     unpaired_msa_lines = unpaired_msa.splitlines()
     for i in range(0, len(unpaired_msa_lines), 2):
         unpaired_msa_lines[i] = unpaired_msa_lines[i].split('\t')[0]
-        print(unpaired_msa_lines[i])
     unpaired_msa = '\n'.join(unpaired_msa_lines)
 
     # Create the templates object.
