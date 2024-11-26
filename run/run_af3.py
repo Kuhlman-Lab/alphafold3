@@ -628,5 +628,9 @@ def main(args_dict: Dict[str, Any]) -> None:
 
 
 if __name__ == '__main__':
+    # Work around for a known XLA issue:
+    # https://github.com/google-deepmind/alphafold3/blob/main/docs/performance.md#compilation-time-workaround-with-xla-flags
+    os.environ["XLA_FLAGS"] = "--xla_gpu_enable_triton_gemm=false"
+
     args_dict = get_af3_args()
     main(args_dict)
