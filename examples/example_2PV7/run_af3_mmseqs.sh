@@ -17,10 +17,6 @@ source ~/.bashrc
 module load gcc/12.2.0
 conda activate af3
 
-# Work around for a known XLA issue:
-# https://github.com/google-deepmind/alphafold3/blob/main/docs/performance.md#compilation-time-workaround-with-xla-flags
-export XLA_FLAGS="--xla_gpu_enable_triton_gemm=false"
-
 # This example makes a prediction for 2PV7 with MMseqs MSA and templates.
 python /proj/kuhl_lab/alphafold3/run/run_af3.py \
     --json_path ./alphafold_input.json \
