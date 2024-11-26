@@ -126,6 +126,15 @@ def get_af3_args() -> Dict[str, Any]:
         "templates for protein queries that have no custom inputs specified."
     )
     
+    # Template search configuration.
+    parser.add_argument(
+        "--max_template_date",
+        type=str,
+        default='3000-01-01', # Set in far future.
+        help="Maximum template release date to consider. Format: YYYY-MM-DD. "
+        "All templates released after this date will be ignored."
+    )
+
     # Compilation arguments.
     parser.add_argument(
         "--jax_compilation_cache_dir",
@@ -154,7 +163,7 @@ def get_af3_args() -> Dict[str, Any]:
     return vars(args)
 
 
-def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str = '') -> str:
+def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> str:
     """Loads a JSON-formatted string and applies some default values if they're not present.
 
     Args:
@@ -162,6 +171,7 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
         run_mmseqs (bool, optional): Whether to run MMseqs for MSAs and templates for 
             protein chains. Defaults to False.
         output_dir (str, optional): Place that'll store MMseqs2 MSAs and templates. Defaults to ''.
+        max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
 
     Returns:
         str: A modified JSON-formatted string containing some extra defaults.
@@ -209,7 +219,8 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                     template_hits = get_custom_template_hits(
                         sequence['protein']['sequence'], 
                         sequence['protein']['unpairedMsa'], 
-                        sequence['protein']['templates']
+                        sequence['protein']['templates'],
+                        max_template_date=max_template_date
                     )
                     sequence['protein']['templates'] = template_hits
                     
@@ -224,13 +235,14 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
     return json_str
 
 
-def load_fold_inputs_from_path(json_path: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '') -> Sequence[Input]:
+def load_fold_inputs_from_path(json_path: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Sequence[Input]:
     """Loads multiple fold inputs from a JSON path.
 
     Args:
         json_path (pathlib.Path): Path to the JSON file
         run_mmseqs (bool, optional): Whether to run MMseqs on protein chains. Defaults to False.
         output_dir (str, optional): Place that'll store MMseqs MSAs and templates. Defaults to ''.
+        max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
 
     Raises:
         ValueError: Fails if we cannot load json_path as an AlphaFold3 JSON
@@ -241,7 +253,7 @@ def load_fold_inputs_from_path(json_path: pathlib.Path, run_mmseqs: bool = False
     # Update the json defaults before parsing it.
     with open(json_path, 'r') as f:
         json_str = f.read()
-    json_str = set_json_defaults(json_str, run_mmseqs, output_dir)
+    json_str = set_json_defaults(json_str, run_mmseqs, output_dir, max_template_date)
     
     fold_inputs = []
     logging.info(
@@ -263,13 +275,14 @@ def load_fold_inputs_from_path(json_path: pathlib.Path, run_mmseqs: bool = False
     return fold_inputs
 
 
-def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '') -> Sequence[Input]:
+def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Sequence[Input]:
     """Loads multiple fold inputs from all JSON files in a given input_dir.
 
     Args:
-        input_dir: The directory containing the JSON files.
-        run_mmseqs: Whether to run MMseq2 on protein chains
-        output_dir: Place that'll store MMseqs2 MSAs and templates.
+        input_dir (pathlib.Path): The directory containing the JSON files.
+        run_mmseqs (bool, optional): Whether to run MMseq2 on protein chains. Defaults to False.
+        output_dir (str, optional): Place that'll store MMseqs2 MSAs and templates. Defaults to ''.
+        max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
 
     Returns:
         The fold inputs from all JSON files in the input directory.
@@ -282,7 +295,7 @@ def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False,
         if not file_path.is_file():
             continue
 
-        fold_inputs.extend(load_fold_inputs_from_path(file_path, run_mmseqs, output_dir))
+        fold_inputs.extend(load_fold_inputs_from_path(file_path, run_mmseqs, output_dir, max_template_date))
 
     check_unique_sanitised_names(fold_inputs)
 
@@ -558,7 +571,8 @@ def get_custom_msa_dict(custom_msa_path: str) -> Dict[str, str]:
 def get_custom_template_hits(
         query_seq: str, 
         unpaired_msa: str, 
-        template_path: str
+        template_path: str,
+        max_template_date: str,
     ) -> Sequence[Dict[str, Union[str, Sequence[int]]]]:
     """Parses .cif files for templates to a query seq and its MSA. This also formats them for AF3 
 
@@ -566,6 +580,7 @@ def get_custom_template_hits(
         query_seq (str): Query sequence for templates.
         unpaired_msa (str): Query's MSA for the HMM.
         template_path (str): Path to directory containing .cif files to search.
+        max_template_date (str): Maximum date allowed for a template to be used.
 
     Returns:
         Sequence[Dict[str, Union[str, Sequence[int]]]]: A list of dictionaries of templates 
@@ -596,7 +611,7 @@ def get_custom_template_hits(
     templates_obj = templates.Templates.from_seq_and_a3m(
         query_sequence=query_seq,
         msa_a3m=unpaired_msa,
-        max_template_date=datetime.date(3000, 1, 1),
+        max_template_date=datetime.date.fromisoformat(max_template_date),
         database_path=db_file,
         hmmsearch_config=msa_config.HmmsearchConfig(
             hmmsearch_binary_path="/spshared/apps/miniconda3/envs/af3/bin/hmmsearch",
