@@ -614,8 +614,8 @@ def get_custom_template_hits(
         max_template_date=datetime.date.fromisoformat(max_template_date),
         database_path=db_file,
         hmmsearch_config=msa_config.HmmsearchConfig(
-            hmmsearch_binary_path="/spshared/apps/miniconda3/envs/af3/bin/hmmsearch",
-            hmmbuild_binary_path="/spshared/apps/miniconda3/envs/af3/bin/hmmbuild",
+            hmmsearch_binary_path=os.path.join(os.environ["CONDA_PREFIX"], "bin", "hmmsearch"),
+            hmmbuild_binary_path=os.path.join(os.environ["CONDA_PREFIX"], "bin", "hmmbuild"),
             filter_f1=0.1,
             filter_f2=0.1,
             filter_f3=0.1,
