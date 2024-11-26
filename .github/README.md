@@ -17,7 +17,7 @@ This repository will be updated frequently so be sure to pull the newest version
 `https://github.com/Kuhlman-Lab/alphafold3.git`
 
 4. Install extra dependencies:
-`mamba install zlib gcc_linux-64 gxx_linux-64 requests`
+`mamba install zlib gcc_linux-64 gxx_linux-64 requests hmmer -c bioconda`
 
 5. Install CUDA Toolkit 12.6:
 `mamba install -c nvidia cuda-toolkit=12.6`
