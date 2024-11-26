@@ -4,6 +4,7 @@
 from collections.abc import Callable, Iterable, Sequence
 import csv
 import dataclasses
+import datetime
 import functools
 import multiprocessing
 import os
@@ -445,6 +446,16 @@ def process_fold_input(
 
     if not fold_input.chains:
         raise ValueError('Fold input has no chains.')
+
+    if os.path.exists(output_dir) and os.listdir(output_dir):
+        new_output_dir = (
+            f'{output_dir}_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
+        )
+        print(
+            f'Output directory {output_dir} exists and non-empty, using instead '
+            f' {new_output_dir}.'
+        )
+        output_dir = new_output_dir
 
     if model_runner is not None:
         # If we're running inference, check we can load the model parameters before
