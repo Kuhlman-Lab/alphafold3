@@ -62,7 +62,7 @@ Now, we'll simply call the `run_af3.py` script, point to this file, use `--outpu
 
 Once you see 
 ```
-Done processing fold input 2PV7.
+Done processing fold input Top7.
 Done processing 1 fold inputs.
 ```
 your prediction has completed! You'll find the predicted structures (`*.cif`) and some confidence predictions in your new `af3_preds` folder.
