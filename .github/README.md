@@ -67,7 +67,7 @@ Done processing 1 fold inputs.
 ```
 your prediction has completed! You'll find the predicted structures (`*.cif`) and some confidence predictions in your new `af3_preds` folder.
 
-For more complicated inputs and examples, please refer to the [input format documentation](docs/input.md) and the `examples` folder.
+For more complicated inputs and examples, please refer to the [input format documentation](../docs/input.md) and the `examples` folder.
 
 
 ## Have suggestions or want to contribute?
