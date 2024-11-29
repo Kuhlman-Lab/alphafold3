@@ -108,6 +108,12 @@ def get_af3_args() -> Dict[str, Any]:
         " XLA attention implementation (no flash attention) and is portable"
         " across GPU devices. Defaults to 'triton'."
     )
+    parser.add_argument(
+        "--num_diffusion_samples",
+        type=int,
+        default=5,
+        help="Number of diffusion samples to generate per seed. Defaults to 5."
+    )
     
     # Control which stages to run.
     parser.add_argument(
