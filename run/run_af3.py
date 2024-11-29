@@ -168,12 +168,16 @@ def make_model_config(
     *,
     model_class: type[ModelT] = diffusion_model.Diffuser,
     flash_attention_implementation: attention.Implementation = 'triton',
+    num_diffusion_samples: int = 5,
 ):
+    """Returns a model config with some defaults overridden."""
     config = model_class.Config()
     if hasattr(config, 'global_config'):
         config.global_config.flash_attention_implementation = (
             flash_attention_implementation
         )
+    if hasattr(config, 'heads'):
+        config.heads.diffusion.eval.num_samples = num_diffusion_samples
     return config
 
 
@@ -605,7 +609,8 @@ def main(args_dict: Dict[str, Any]) -> None:
           config=make_model_config(
               flash_attention_implementation=typing.cast(
                   attention.Implementation, args_dict["flash_attention_implementation"]
-              )
+              ),
+              num_diffusion_samples=args_dict["num_diffusion_samples"],
           ),
           device=devices[0],
           model_dir=pathlib.Path(args_dict["model_dir"]),
