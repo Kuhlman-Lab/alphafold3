@@ -204,12 +204,12 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                     # If we don't have unpairedMsa and templates and we want them, then use MMseqs
                     # to generate them
                     a3m_path, template_dir = run_mmseqs2(
-                        os.path.join(output_dir, f'mmseqs_{sequence["protein"]["id"][0]}'),
+                        os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_{sequence["protein"]["id"][0]}'),
                         sequence['protein']['sequence'],
                         use_templates=True
                     )
                     set_if_absent(sequence['protein'], 'unpairedMsa', a3m_path)
-                    set_if_absent(sequence['protein'], 'templates', template_dir if not None else [])
+                    set_if_absent(sequence['protein'], 'templates', [] if template_dir is None else template_dir)
                 else:
                     # Set empty values.
                     set_if_absent(sequence['protein'], 'unpairedMsa', '')
