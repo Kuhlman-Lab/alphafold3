@@ -165,8 +165,10 @@ def get_af3_parser() -> FileArgumentParser:
 def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
     """Reformats args and returns a dictionary parsed args.
 
-    If no arg_file is provided, then arguments are assumed to come from the
-    command line.
+    Args:
+        arg_file (str, optional): Path to the file containing argument key-
+            value pairs. If None, then arguments are assumed to come from the
+            command line. Defaults to None.
 
     Returns:
         Dict[str, Any]: Dictionary mapping argument key to argument value.
