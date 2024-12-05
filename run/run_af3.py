@@ -523,10 +523,10 @@ def main(args_dict: Dict[str, Any]) -> None:
 
     # Make sure we can create the output directory before running anything.
     try:
-      os.makedirs(args_dict["output_dir"], exist_ok=True)
+        os.makedirs(args_dict["output_dir"], exist_ok=True)
     except OSError as e:
-      print(f'Failed to create output directory {args_dict["output_dir"]}: {e}')
-      raise
+        print(f'Failed to create output directory {args_dict["output_dir"]}: {e}')
+        raise
 
     if args_dict["input_dir"] is not None:
         fold_inputs = load_fold_inputs_from_dir(
@@ -600,24 +600,24 @@ def main(args_dict: Dict[str, Any]) -> None:
         data_pipeline_config = None
 
     if args_dict["run_inference"]:
-      devices = jax.local_devices(backend='gpu')
-      print(f'Found local devices: {devices}')
+        devices = jax.local_devices(backend='gpu')
+        print(f'Found local devices: {devices}')
 
-      print('Building model from scratch...')
-      model_runner = ModelRunner(
-          model_class=diffusion_model.Diffuser,
-          config=make_model_config(
-              flash_attention_implementation=typing.cast(
-                  attention.Implementation, args_dict["flash_attention_implementation"]
-              ),
-              num_diffusion_samples=args_dict["num_diffusion_samples"],
-          ),
-          device=devices[0],
-          model_dir=pathlib.Path(args_dict["model_dir"]),
-      )
+        print('Building model from scratch...')
+        model_runner = ModelRunner(
+            model_class=diffusion_model.Diffuser,
+            config=make_model_config(
+                flash_attention_implementation=typing.cast(
+                    attention.Implementation, args_dict["flash_attention_implementation"]
+                ),
+                num_diffusion_samples=args_dict["num_diffusion_samples"],
+            ),
+            device=devices[0],
+            model_dir=pathlib.Path(args_dict["model_dir"]),
+        )
     else:
-      print('Skipping running model inference.')
-      model_runner = None
+        print('Skipping running model inference.')
+        model_runner = None
 
     print(f'Processing {len(fold_inputs)} fold inputs.')
     for fold_input in fold_inputs:
