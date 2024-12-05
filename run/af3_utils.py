@@ -57,11 +57,11 @@ def set_if_absent(d: Dict[str, Any], key: str, default_value: Any) -> None:
         d[key] = default_value
 
 
-def get_af3_args() -> Dict[str, Any]:
-    """Creates a parser for AF3 and returns a dictionary of the parsed args.
+def get_af3_parser() -> FileArgumentParser:
+    """Creates a parser for AF3.
 
     Returns:
-        Dict[str, Any]: Dictionary mapping argument key to argument value.
+        FileArgumentParser: Argument parser for AF3.
     """
     parser = FileArgumentParser(
         description="Runner script for AlphaFold3.",
@@ -158,8 +158,26 @@ def get_af3_args() -> Dict[str, Any]:
         " exactly that number of tokens. Defaults to"
         " '256,512,768,1024,1280,1536,2048,2560,3072,3584,4096,4608,5120'."
     )
+
+    return parser
+
+
+def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
+    """Reformats args and returns a dictionary parsed args.
+
+    If no arg_file is provided, then arguments are assumed to come from the
+    command line.
+
+    Returns:
+        Dict[str, Any]: Dictionary mapping argument key to argument value.
+    """
     
-    args = parser.parse_args()
+    # Get the parser and args
+    parser = get_af3_parser()
+    if arg_file is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args([f'@{arg_file}'])
     
     # Reformat some of the arguments
     args.run_inference = binary_to_bool(args.run_inference)
