@@ -1,3 +1,4 @@
+import os
 import json
 import pathlib
 import typing
@@ -15,6 +16,10 @@ from run_af3 import ModelRunner, make_model_config, predict_structure
 
 
 def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[int]]]) -> Callable:
+    # Work around for a known XLA issue:
+    # https://github.com/google-deepmind/alphafold3/blob/main/docs/performance.md#compilation-time-workaround-with-xla-flags
+    os.environ["XLA_FLAGS"] = "--xla_gpu_enable_triton_gemm=false"
+    
     args_dict = get_af3_args(arg_file)
 
     if args_dict['jax_compilation_cache_dir'] is not None:
