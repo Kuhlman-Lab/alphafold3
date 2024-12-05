@@ -57,11 +57,11 @@ def set_if_absent(d: Dict[str, Any], key: str, default_value: Any) -> None:
         d[key] = default_value
 
 
-def get_af3_args() -> Dict[str, Any]:
-    """Creates a parser for AF3 and returns a dictionary of the parsed args.
+def get_af3_parser() -> FileArgumentParser:
+    """Creates a parser for AF3.
 
     Returns:
-        Dict[str, Any]: Dictionary mapping argument key to argument value.
+        FileArgumentParser: Argument parser for AF3.
     """
     parser = FileArgumentParser(
         description="Runner script for AlphaFold3.",
@@ -158,8 +158,28 @@ def get_af3_args() -> Dict[str, Any]:
         " exactly that number of tokens. Defaults to"
         " '256,512,768,1024,1280,1536,2048,2560,3072,3584,4096,4608,5120'."
     )
+
+    return parser
+
+
+def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
+    """Reformats args and returns a dictionary parsed args.
+
+    Args:
+        arg_file (str, optional): Path to the file containing argument key-
+            value pairs. If None, then arguments are assumed to come from the
+            command line. Defaults to None.
+
+    Returns:
+        Dict[str, Any]: Dictionary mapping argument key to argument value.
+    """
     
-    args = parser.parse_args()
+    # Get the parser and args
+    parser = get_af3_parser()
+    if arg_file is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args([f'@{arg_file}'])
     
     # Reformat some of the arguments
     args.run_inference = binary_to_bool(args.run_inference)
@@ -188,7 +208,7 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
     if isinstance(raw_json, list):
         # AlphaFold Server JSON.
         # Don't apply the defaults to this format.
-        pass
+        return raw_json
     else:
         # These defaults may need changed with future AF3 updates.
         set_if_absent(raw_json, 'dialect', 'alphafold3')
@@ -234,18 +254,16 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                 set_if_absent(sequence['protein'], 'pairedMsa', '')
             elif 'rna' in sequence:
                 set_if_absent(sequence['rna'], 'unpairedMsa', '')
-                
-        # Convert the dictionary back to a str
-        json_str = json.dumps(raw_json)
     
-    return json_str
+    return raw_json
 
 
-def load_fold_inputs_from_path(json_path: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Sequence[Input]:
-    """Loads multiple fold inputs from a JSON path.
+def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Sequence[Input]:
+    """Loads multiple fold inputs from a JSON path (or string of a JSON).
 
     Args:
-        json_path (pathlib.Path): Path to the JSON file
+        json_path (Union[pathlib.Path, str]): Either the path to the JSON file or the string 
+            corresponding to it.
         run_mmseqs (bool, optional): Whether to run MMseqs on protein chains. Defaults to False.
         output_dir (str, optional): Place that'll store MMseqs MSAs and templates. Defaults to ''.
         max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
@@ -257,24 +275,47 @@ def load_fold_inputs_from_path(json_path: pathlib.Path, run_mmseqs: bool = False
         Sequence[Input]: A list of folding inputs.
     """
     # Update the json defaults before parsing it.
-    with open(json_path, 'r') as f:
-        json_str = f.read()
-    json_str = set_json_defaults(json_str, run_mmseqs, output_dir, max_template_date)
-    
+    if not isinstance(json_path, str):
+        with open(json_path, 'r') as f:
+            json_str = f.read()
+    else:
+        json_str = json_path
+    raw_json = set_json_defaults(json_str, run_mmseqs, output_dir, max_template_date)
+    json_str = json.dumps(raw_json)
+
     fold_inputs = []
-    logging.info(
-        'Detected %s is an AlphaFold 3 JSON since the top-level is not a list.',
-        json_path,
-    )
-    # AlphaFold 3 JSON.
-    try:
-        fold_inputs.append(Input.from_json(json_str))
-    except ValueError as e:
-        raise ValueError(
-            f'Failed to load fold input from {json_path}. The JSON at'
-            f' {json_path} was detected to be an AlphaFold 3 JSON since the'
-            ' top-level is not a list.'
-        ) from e
+    if isinstance(raw_json, list):
+        # AlphaFold Server JSON.
+        logging.info(
+            'Detected %s is an AlphaFold Server JSON since the top-level is a'
+            ' list.',
+            json_path,
+        )
+
+        logging.info('Loading %d fold jobs from %s', len(raw_json), json_path)
+        for fold_job_idx, fold_job in enumerate(raw_json):
+            try:
+                fold_inputs.append(Input.from_alphafoldserver_fold_job(fold_job))
+            except ValueError as e:
+                raise ValueError(
+                    f'Failed to load fold job {fold_job_idx} from {json_path}. The JSON'
+                    f' at {json_path} was detected to be an AlphaFold Server JSON since'
+                    ' the top-level is a list.'
+                ) from e
+    else:
+        logging.info(
+            'Detected %s is an AlphaFold 3 JSON since the top-level is not a list.',
+            json_path,
+        )
+        # AlphaFold 3 JSON.
+        try:
+            fold_inputs.append(Input.from_json(json_str))
+        except ValueError as e:
+            raise ValueError(
+                f'Failed to load fold input from {json_path}. The JSON at'
+                f' {json_path} was detected to be an AlphaFold 3 JSON since the'
+                ' top-level is not a list.'
+            ) from e
 
     check_unique_sanitised_names(fold_inputs)
 
