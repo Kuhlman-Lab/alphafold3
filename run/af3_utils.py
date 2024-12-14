@@ -329,7 +329,7 @@ def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False,
     Yields:
         The fold inputs from all JSON files in the input directory.
     """
-    for file_path in input_dir.glob('*.json'):
+    for file_path in sorted(input_dir.glob('*.json')):
         if not file_path.is_file():
             continue
 
