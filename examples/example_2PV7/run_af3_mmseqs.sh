@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J af3_mmseqs-homodimer
+#SBATCH -J af3_mmseqs-2PV7
 #SBATCH -p a100-gpu
 #SBATCH -N 1
 #SBATCH -n 1
