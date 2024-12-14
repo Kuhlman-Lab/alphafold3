@@ -8,7 +8,7 @@ import json
 import pathlib
 import logging
 import requests
-from alphafold3.common.folding_input import Input, check_unique_sanitised_names, Template
+from alphafold3.common.folding_input import Input, Template
 from alphafold3.data import templates, structure_stores, msa_config
 from alphafold3.structure import from_mmcif
 
@@ -317,8 +317,6 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
                 ' top-level is not a list.'
             ) from e
 
-    check_unique_sanitised_names(fold_inputs)
-
     return fold_inputs
 
 
@@ -343,8 +341,6 @@ def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False,
             continue
 
         fold_inputs.extend(load_fold_inputs_from_path(file_path, run_mmseqs, output_dir, max_template_date))
-
-    check_unique_sanitised_names(fold_inputs)
 
     return fold_inputs
 
