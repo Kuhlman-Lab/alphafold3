@@ -3,7 +3,7 @@ import time
 import argparse
 import datetime
 import tarfile
-from typing import Sequence, Dict, Any, Union, Tuple, Optional
+from typing import Sequence, Dict, Any, Union, Tuple, Optional, Iterator
 import json
 import pathlib
 import logging
@@ -258,7 +258,7 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
     return raw_json
 
 
-def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Sequence[Input]:
+def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Iterator[Input]:
     """Loads multiple fold inputs from a JSON path (or string of a JSON).
 
     Args:
@@ -271,8 +271,8 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
     Raises:
         ValueError: Fails if we cannot load json_path as an AlphaFold3 JSON
 
-    Returns:
-        Sequence[Input]: A list of folding inputs.
+    Yields:
+        The folding inputs.
     """
     # Update the json defaults before parsing it.
     if not isinstance(json_path, str):
@@ -283,7 +283,6 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
     raw_json = set_json_defaults(json_str, run_mmseqs, output_dir, max_template_date)
     json_str = json.dumps(raw_json)
 
-    fold_inputs = []
     if isinstance(raw_json, list):
         # AlphaFold Server JSON.
         logging.info(
@@ -295,7 +294,7 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
         logging.info('Loading %d fold jobs from %s', len(raw_json), json_path)
         for fold_job_idx, fold_job in enumerate(raw_json):
             try:
-                fold_inputs.append(Input.from_alphafoldserver_fold_job(fold_job))
+                yield Input.from_alphafoldserver_fold_job(fold_job)
             except ValueError as e:
                 raise ValueError(
                     f'Failed to load fold job {fold_job_idx} from {json_path}. The JSON'
@@ -309,7 +308,7 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
         )
         # AlphaFold 3 JSON.
         try:
-            fold_inputs.append(Input.from_json(json_str))
+            yield Input.from_json(json_str)
         except ValueError as e:
             raise ValueError(
                 f'Failed to load fold input from {json_path}. The JSON at'
@@ -317,10 +316,8 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
                 ' top-level is not a list.'
             ) from e
 
-    return fold_inputs
 
-
-def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Sequence[Input]:
+def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Iterator[Input]:
     """Loads multiple fold inputs from all JSON files in a given input_dir.
 
     Args:
@@ -329,20 +326,14 @@ def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False,
         output_dir (str, optional): Place that'll store MMseqs2 MSAs and templates. Defaults to ''.
         max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
 
-    Returns:
+    Yields:
         The fold inputs from all JSON files in the input directory.
-
-    Raises:
-        ValueError: If the fold inputs have non-unique sanitised names.
     """
-    fold_inputs = []
     for file_path in input_dir.glob('*.json'):
         if not file_path.is_file():
             continue
 
-        fold_inputs.extend(load_fold_inputs_from_path(file_path, run_mmseqs, output_dir, max_template_date))
-
-    return fold_inputs
+        yield from load_fold_inputs_from_path(file_path, run_mmseqs, output_dir, max_template_date)
 
 
 def run_mmseqs2(
