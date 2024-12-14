@@ -222,13 +222,13 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
     else:
         # These defaults may need changed with future AF3 updates.
         set_if_absent(raw_json, 'dialect', 'alphafold3')
-        set_if_absent(raw_json, 'version', 1)
+        set_if_absent(raw_json, 'version', 2)
         
         # Set default values for empty MSAs and templates
         for sequence in raw_json['sequences']:
             if "protein" in sequence:
-                if 'unpairedMsa' in sequence['protein'] and 'templates' in sequence['protein']:
-                    # If both, unpairedMsa and templates are provided, use them and maybe set pairedMsa
+                if ('unpairedMsa' in sequence['protein'] or 'unpairedMsaPath' in sequence['protein']) and 'templates' in sequence['protein']:
+                    # If both unpairedMsa (or unpairedMsaPath) and templates are provided, use them and maybe set pairedMsa
                     pass
                 elif run_mmseqs:
                     # If we don't have unpairedMsa and templates and we want them, then use MMseqs
@@ -238,12 +238,18 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                         sequence['protein']['sequence'],
                         use_templates=True
                     )
-                    set_if_absent(sequence['protein'], 'unpairedMsa', a3m_path)
+                    if 'unpairedMsa' not in sequence['protein'] and 'unpairedMsaPath' not in sequence['protein']:
+                        set_if_absent(sequence['protein'], 'unpairedMsa', a3m_path)
                     set_if_absent(sequence['protein'], 'templates', [] if template_dir is None else template_dir)
                 else:
                     # Set empty values.
                     set_if_absent(sequence['protein'], 'unpairedMsa', '')
                     set_if_absent(sequence['protein'], 'templates', [])
+
+                if 'unpairedMsaPath' in sequence['protein']:
+                    # Move unpairedMsaPath to unpairedMsa for unified parsing of MSAs
+                    sequence['protein']['unpairedMsa'] = sequence['protein']['unpairedMsaPath']
+                    del sequence['protein']['unpairedMsaPath']
                     
                 if sequence['protein']['unpairedMsa'] != "" and os.path.exists(sequence['protein']['unpairedMsa']):
                     # If unpairedMsa isn't empty and is a path that exists, parse it as a custom MSA
@@ -318,7 +324,7 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
         )
         # AlphaFold 3 JSON.
         try:
-            yield Input.from_json(json_str)
+            yield Input.from_json(json_str, json_path if not isinstance(json_path, str) else None)
         except ValueError as e:
             raise ValueError(
                 f'Failed to load fold input from {json_path}. The JSON at'
