@@ -627,7 +627,7 @@ def main(args_dict: Dict[str, Any]) -> None:
     else:
         print('Skipping running model inference.')
         model_runner = None
-
+        
     print('Processing fold inputs.')
     num_fold_inputs = 0
     for fold_input in fold_inputs:

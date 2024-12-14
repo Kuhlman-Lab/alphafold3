@@ -341,7 +341,7 @@ def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False,
         run_mmseqs (bool, optional): Whether to run MMseq2 on protein chains. Defaults to False.
         output_dir (str, optional): Place that'll store MMseqs2 MSAs and templates. Defaults to ''.
         max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
-
+        
     Yields:
         The fold inputs from all JSON files in the input directory.
     """
