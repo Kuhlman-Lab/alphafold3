@@ -550,13 +550,22 @@ def main(args_dict: Dict[str, Any]) -> None:
     if args_dict["run_inference"]:
         # Fail early on incompatible devices, but only if we're running inference.
         gpu_devices = jax.local_devices(backend='gpu')
-        if gpu_devices and float(gpu_devices[0].compute_capability) < 8.0:
-            raise ValueError(
-                'There are currently known unresolved numerical issues with using'
-                ' devices with compute capability less than 8.0. See '
-                ' https://github.com/google-deepmind/alphafold3/issues/59 for'
-                ' tracking.'
-            )
+        if gpu_devices:
+            compute_capability = float(gpu_devices[0].compute_capability)
+            if compute_capability < 6.0:
+                raise ValueError(
+                    'AlphaFold 3 requires at least GPU compute capability 6.0 (see'
+                    ' https://developer.nvidia.com/cuda-gpus).'
+                )
+            elif 7.0 <= compute_capability < 8.0:
+                xla_flags = os.environ.get('XLA_FLAGS')
+                required_flag = '--xla_disable_hlo_passes=custom-kernel-fusion-rewriter'
+                if not xla_flags or required_flag not in xla_flags:
+                    raise ValueError(
+                        'For devices with GPU compute capability 7.x (see'
+                        ' https://developer.nvidia.com/cuda-gpus), you must include'
+                        ' the --cuda_compute_7x flag.'
+                    )
 
     notice = textwrap.wrap(
         'Running AlphaFold 3. Please note that standard AlphaFold 3 model'
@@ -636,9 +645,14 @@ def main(args_dict: Dict[str, Any]) -> None:
 
 
 if __name__ == '__main__':
+    args_dict = get_af3_args()
+
     # Work around for a known XLA issue:
     # https://github.com/google-deepmind/alphafold3/blob/main/docs/performance.md#compilation-time-workaround-with-xla-flags
     os.environ["XLA_FLAGS"] = "--xla_gpu_enable_triton_gemm=false"
 
-    args_dict = get_af3_args()
+    # Add required flag for CUDA compute capability 7.x
+    if args_dict["cuda_compute_7x"]:
+        os.environ["XLA_FLAGS"] = "--xla_disable_hlo_passes=custom-kernel-fusion-rewriter"
+
     main(args_dict)
