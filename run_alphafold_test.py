@@ -137,7 +137,7 @@ class InferenceTest(test_utils.StructureTestCase):
         / 'test_data/miniature_databases/rnacentral_active_seq_id_90_cov_80_linclust__subsampled_1000.fasta'
     ).path()
     pdb_database_path = testing_data.Data(
-        resources.ROOT / 'data/testdata/templates_v2/ww_pdb'
+        resources.ROOT / 'test_data/miniature_databases/pdb_mmcif'
     ).path()
     seqres_database_path = testing_data.Data(
         resources.ROOT
@@ -223,7 +223,7 @@ class InferenceTest(test_utils.StructureTestCase):
           # since the input is missing MSAs.
           data_pipeline_config=None,
           model_runner=self._runner,
-          output_dir=self.create_tempdir(),
+          output_dir=self.create_tempdir().full_path,
       )
 
   @parameterized.named_parameters(
@@ -244,7 +244,7 @@ class InferenceTest(test_utils.StructureTestCase):
     ### Prepare inputs.
     fold_input = folding_input.Input.from_json(self._test_input_json)
 
-    output_dir = self.create_tempdir()
+    output_dir = self.create_tempdir().full_path
     actual = run_alphafold.process_fold_input(
         fold_input,
         self._data_pipeline_config,

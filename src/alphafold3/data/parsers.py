@@ -73,7 +73,7 @@ def convert_a3m_to_stockholm(a3m: str, max_seqs: int | None = None) -> str:
   # Add the Stockholm header with the sequence metadata.
   names = []
   for i, description in enumerate(descriptions):
-    name, _, rest = description.partition(' ')
+    name, _, rest = description.replace('\t', ' ').partition(' ')
     # Ensure that the names are unique - stockholm format requires that
     # the sequence names are unique.
     name = f'{name}_{i}'

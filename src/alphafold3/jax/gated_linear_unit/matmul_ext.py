@@ -50,16 +50,17 @@ def _get_pids(
     pid, num_blocks_m, num_blocks_n, group_size_m
 ) -> tuple[ScalarInt, ScalarInt]:
   """Returns the program IDs in each grid axis."""
-  # We use `div` and `rem` here as we know `pid` is always >= 0. `//` and `%` on
-  # signed integers adds significant complexity.
+  # Use `floor_divide` and `remainder` (instead of lax.div and lax.rem)
+  # to handle dtypes: pid (int32) vs. num_blocks_n (int64) when `jax_enable_x64`
+  # is set.
   if group_size_m == 1:
-    return jax.lax.div(pid, num_blocks_n), jax.lax.rem(pid, num_blocks_n)
+    return jnp.floor_divide(pid, num_blocks_n), jnp.remainder(pid, num_blocks_n)
 
   num_progs_in_group = group_size_m * num_blocks_n
-  group_start_m = jax.lax.div(pid, num_progs_in_group) * group_size_m
+  group_start_m = jnp.floor_divide(pid, num_progs_in_group) * group_size_m
   group_size_m = jnp.minimum(num_blocks_m - group_start_m, group_size_m)
-  pid_m = group_start_m + jax.lax.rem(pid, group_size_m)
-  pid_n = jax.lax.div(jax.lax.rem(pid, num_progs_in_group), group_size_m)
+  pid_m = group_start_m + jnp.remainder(pid, group_size_m)
+  pid_n = jnp.floor_divide(jnp.remainder(pid, num_progs_in_group), group_size_m)
   return pid_m, pid_n
 
 

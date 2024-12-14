@@ -102,7 +102,6 @@ class WholePdbPipeline:
       max_paired_sequence_per_species: The maximum number of sequences per
         species that will be used for MSA pairing.
       drop_ligand_leaving_atoms: Flag for handling leaving atoms for ligands.
-      intra_ligand_ptm_bonds: Whether to embed intra ligand covalent bond graph.
       average_num_atoms_per_token: Target average number of atoms per token to
         compute the padding size for flat atoms.
       atom_cross_att_queries_subset_size: queries subset size in atom cross
@@ -128,7 +127,6 @@ class WholePdbPipeline:
     filter_crystal_aids: bool = False
     max_paired_sequence_per_species: int = 600
     drop_ligand_leaving_atoms: bool = True
-    intra_ligand_ptm_bonds: bool = True
     average_num_atoms_per_token: int = 24
     atom_cross_att_queries_subset_size: int = 32
     atom_cross_att_keys_subset_size: int = 128
@@ -358,7 +356,6 @@ class WholePdbPipeline:
             chemical_components_data=chemical_components_data,
             random_state=random_state,
             ref_max_modified_date=ref_max_modified_date,
-            intra_ligand_ptm_bonds=self._config.intra_ligand_ptm_bonds,
             ligand_ligand_bonds=ligand_ligand_bonds,
         )
     )
@@ -373,7 +370,6 @@ class WholePdbPipeline:
               np.random.RandomState(_DETERMINISTIC_FRAMES_RANDOM_SEED)
           ),
           ref_max_modified_date=ref_max_modified_date,
-          intra_ligand_ptm_bonds=self._config.intra_ligand_ptm_bonds,
           ligand_ligand_bonds=ligand_ligand_bonds,
       )
 

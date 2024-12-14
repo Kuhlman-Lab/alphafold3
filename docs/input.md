@@ -116,7 +116,7 @@ The top-level structure of the input JSON is:
   "bondedAtomPairs": [...],  # Optional
   "userCCD": "...",  # Optional
   "dialect": "alphafold3",  # Required
-  "version": 1  # Required
+  "version": 2  # Required
 }
 ```
 
@@ -144,9 +144,19 @@ The fields specify the following:
     `alphafold3`. See
     [AlphaFold Server JSON Compatibility](#alphafold-server-json-compatibility)
     for more information.
-*   `version: int`: The version of the input JSON. This must be set to 1. See
+*   `version: int`: The version of the input JSON. This must be set to 1 or 2.
+    See
     [AlphaFold Server JSON Compatibility](#alphafold-server-json-compatibility)
-    for more information.
+    and [versions](#versions) below for more information.
+
+## Versions
+
+The top-level `version` field (for the `alphafold3` dialect) can be either `1`
+or `2`. The following features have been added in respective versions:
+
+*   `1`: the initial AlphaFold 3 input format.
+*   `2`: added the option of specifying external MSA and templates using newly
+    added fields `unpairedMsaPath`, `pairedMsaPath`, and `mmcifPath`.
 
 ## Sequences
 
@@ -167,8 +177,10 @@ Specifies a single protein chain.
       {"ptmType": "HY3", "ptmPosition": 1},
       {"ptmType": "P1L", "ptmPosition": 5}
     ],
-    "unpairedMsa": ...,
-    "pairedMsa": ...,
+    "unpairedMsa": ...,  # Mutually exclusive with unpairedMsaPath.
+    "unpairedMsaPath": ...,  # Mutually exclusive with unpairedMsa.
+    "pairedMsa": ...,  # Mutually exclusive with pairedMsaPath.
+    "pairedMsaPath": ...,  # Mutually exclusive with pairedMsa.
     "templates": [...]
   }
 }
@@ -190,8 +202,18 @@ The fields specify the following:
     This is specified using the A3M format (equivalent to the FASTA format, but
     also allows gaps denoted by the hyphen `-` character). See more details
     below.
+*   `unpairedMsaPath: str`: An optional path to a file that contains the
+    multiple sequence alignment for this chain instead of providing it inline
+    using the `unpairedMsa` field. The path can be either absolute, or relative
+    to the input JSON path. The file must be in the A3M format, and could be
+    either plain text, or compressed using gzip, xz, or zstd.
 *   `pairedMsa: str`: We recommend *not* using this optional field and using the
     `unpairedMsa` for the purposes of pairing. See more details below.
+*   `pairedMsaPath: str`: An optional path to a file that contains the multiple
+    sequence alignment for this chain instead of providing it inline using the
+    `pairedMsa` field. The path can be either absolute, or relative to the input
+    JSON path. The file must be in the A3M format, and could be either plain
+    text, or compressed using gzip, xz, or zstd.
 *   `templates: list[Template]`: An optional list of structural templates. See
     more details below.
 
@@ -208,7 +230,8 @@ Specifies a single RNA chain.
       {"modificationType": "2MG", "basePosition": 1},
       {"modificationType": "5MC", "basePosition": 4}
     ],
-    "unpairedMsa": ...
+    "unpairedMsa": ...,  # Mutually exclusive with unpairedMsaPath.
+    "unpairedMsaPath": ...  # Mutually exclusive with unpairedMsa.
   }
 }
 ```
@@ -225,6 +248,11 @@ The fields specify the following:
     Each modification is specified using its CCD code and 1-based base position.
 *   `unpairedMsa: str`: An optional multiple sequence alignment for this chain.
     This is specified using the A3M format. See more details below.
+*   `unpairedMsaPath: str`: An optional path to a file that contains the
+    multiple sequence alignment for this chain instead of providing it inline
+    using the `unpairedMsa` field. The path can be either absolute, or relative
+    to the input JSON path. The file must be in the A3M format, and could be
+    either plain text, or compressed using gzip, xz, or zstd.
 
 ### DNA
 
@@ -451,12 +479,27 @@ Structural templates can be specified only for protein chains:
 ```json
 "templates": [
   {
-    "mmcif": ...,
+    "mmcif": ...,  # Mutually exclusive with mmcifPath.
+    "mmcifPath": ...,  # Mutually exclusive with mmcif.
     "queryIndices": [0, 1, 2, 4, 5, 6],
     "templateIndices": [0, 1, 2, 3, 4, 8]
   }
 ]
 ```
+
+The fields specify the following:
+
+*   `mmcif: str`: A string containing the single chain protein structural
+    template in the mmCIF format.
+*   `mmcifPath: str`: An optional path to a file that contains the mmCIF with
+    the structural template instead of providing it inline using the `mmcifPath`
+    field. The path can be either absolute, or relative to the input JSON path.
+    The file must be in the A3M format, and could be either plain text, or
+    compressed using gzip, xz, or zstd.
+*   `queryIndices: list[int]`: O-based indices in the query sequence, defining
+    the mapping from query residues to template residues.
+*   `templateIndices: list[int]`: O-based indices in the template sequence,
+    defining the mapping from query residues to template residues.
 
 A template is specified as an mmCIF string containing a single chain with the
 structural template together with a 0-based mapping that maps query residue
@@ -637,80 +680,104 @@ _chem_comp.formula_weight 190.152
 loop_
 _chem_comp_atom.comp_id
 _chem_comp_atom.atom_id
-_chem_comp_atom.alt_atom_id
 _chem_comp_atom.type_symbol
 _chem_comp_atom.charge
-_chem_comp_atom.pdbx_align
-_chem_comp_atom.pdbx_aromatic_flag
 _chem_comp_atom.pdbx_leaving_atom_flag
-_chem_comp_atom.pdbx_stereo_config
-_chem_comp_atom.pdbx_backbone_atom_flag
-_chem_comp_atom.pdbx_n_terminal_atom_flag
-_chem_comp_atom.pdbx_c_terminal_atom_flag
-_chem_comp_atom.model_Cartn_x
-_chem_comp_atom.model_Cartn_y
-_chem_comp_atom.model_Cartn_z
 _chem_comp_atom.pdbx_model_Cartn_x_ideal
 _chem_comp_atom.pdbx_model_Cartn_y_ideal
 _chem_comp_atom.pdbx_model_Cartn_z_ideal
-_chem_comp_atom.pdbx_component_atom_id
-_chem_comp_atom.pdbx_component_comp_id
-_chem_comp_atom.pdbx_ordinal
-MY-X7F C02 C1 C 0 1 N N N N N N 48.727 17.090 17.537 -1.418 -1.260 0.018 C02 MY-X7F 1
-MY-X7F C03 C2 C 0 1 N N N N N N 47.344 16.691 17.993 -0.665 -2.503 -0.247 C03 MY-X7F 2
-MY-X7F C04 C3 C 0 1 N N N N N N 47.166 16.016 19.310 0.677 -2.501 -0.235 C04 MY-X7F 3
-MY-X7F C05 C4 C 0 1 N N N N N N 48.363 15.728 20.184 1.421 -1.257 0.043 C05 MY-X7F 4
-MY-X7F C06 C5 C 0 1 Y N N N N N 49.790 16.142 19.699 0.706 0.032 0.008 C06 MY-X7F 5
-MY-X7F C07 C6 C 0 1 Y N N N N N 49.965 16.791 18.444 -0.706 0.030 -0.004 C07 MY-X7F 6
-MY-X7F C08 C7 C 0 1 Y N N N N N 51.249 17.162 18.023 -1.397 1.240 -0.037 C08 MY-X7F 7
-MY-X7F C10 C8 C 0 1 Y N N N N N 52.359 16.893 18.837 -0.685 2.443 -0.057 C10 MY-X7F 8
-MY-X7F C11 C9 C 0 1 Y N N N N N 52.184 16.247 20.090 0.679 2.445 -0.045 C11 MY-X7F 9
-MY-X7F C12 C10 C 0 1 Y N N N N N 50.899 15.876 20.515 1.394 1.243 -0.013 C12 MY-X7F 10
-MY-X7F O01 O1 O 0 1 N N N N N N 48.876 17.630 16.492 -2.611 -1.301 0.247 O01 MY-X7F 11
-MY-X7F O09 O2 O 0 1 N N N N N N 51.423 17.798 16.789 -2.752 1.249 -0.049 O09 MY-X7F 12
-MY-X7F O13 O3 O 0 1 N N N N N N 50.710 15.236 21.750 2.750 1.257 -0.001 O13 MY-X7F 13
-MY-X7F O14 O4 O 0 1 N N N N N N 48.229 15.189 21.234 2.609 -1.294 0.298 O14 MY-X7F 14
-MY-X7F H1 H1 H 0 1 N N N N N N 46.487 16.894 17.367 -1.199 -3.419 -0.452 H1 MY-X7F 15
-MY-X7F H2 H2 H 0 1 N N N N N N 46.178 15.732 19.640 1.216 -3.416 -0.429 H2 MY-X7F 16
-MY-X7F H3 H3 H 0 1 N N N N N N 53.348 17.177 18.511 -1.221 3.381 -0.082 H3 MY-X7F 17
-MY-X7F H4 H4 H 0 1 N N N N N N 53.040 16.041 20.716 1.212 3.384 -0.062 H4 MY-X7F 18
-MY-X7F H5 H5 H 0 1 N N N N N N 50.579 17.904 16.365 -3.154 1.271 0.830 H5 MY-X7F 19
-MY-X7F H6 H6 H 0 1 N N N N N N 49.785 15.059 21.877 3.151 1.241 -0.880 H6 MY-X7F 20
+MY-X7F C02 C 0 N -1.418 -1.260 0.018
+MY-X7F C03 C 0 N -0.665 -2.503 -0.247
+MY-X7F C04 C 0 N 0.677 -2.501 -0.235
+MY-X7F C05 C 0 N 1.421 -1.257 0.043
+MY-X7F C06 C 0 N 0.706 0.032 0.008
+MY-X7F C07 C 0 N -0.706 0.030 -0.004
+MY-X7F C08 C 0 N -1.397 1.240 -0.037
+MY-X7F C10 C 0 N -0.685 2.443 -0.057
+MY-X7F C11 C 0 N 0.679 2.445 -0.045
+MY-X7F C12 C 0 N 1.394 1.243 -0.013
+MY-X7F O01 O 0 N -2.611 -1.301 0.247
+MY-X7F O09 O 0 N -2.752 1.249 -0.049
+MY-X7F O13 O 0 N 2.750 1.257 -0.001
+MY-X7F O14 O 0 N 2.609 -1.294 0.298
+MY-X7F H1 H 0 N -1.199 -3.419 -0.452
+MY-X7F H2 H 0 N 1.216 -3.416 -0.429
+MY-X7F H3 H 0 N -1.221 3.381 -0.082
+MY-X7F H4 H 0 N 1.212 3.384 -0.062
+MY-X7F H5 H 0 N -3.154 1.271 0.830
+MY-X7F H6 H 0 N 3.151 1.241 -0.880
 #
 loop_
-_chem_comp_bond.comp_id
 _chem_comp_bond.atom_id_1
 _chem_comp_bond.atom_id_2
 _chem_comp_bond.value_order
 _chem_comp_bond.pdbx_aromatic_flag
-_chem_comp_bond.pdbx_stereo_config
-_chem_comp_bond.pdbx_ordinal
-MY-X7F O01 C02 DOUB N N 1
-MY-X7F O09 C08 SING N N 2
-MY-X7F C02 C03 SING N N 3
-MY-X7F C02 C07 SING N N 4
-MY-X7F C03 C04 DOUB N N 5
-MY-X7F C08 C07 DOUB Y N 6
-MY-X7F C08 C10 SING Y N 7
-MY-X7F C07 C06 SING Y N 8
-MY-X7F C10 C11 DOUB Y N 9
-MY-X7F C04 C05 SING N N 10
-MY-X7F C06 C05 SING N N 11
-MY-X7F C06 C12 DOUB Y N 12
-MY-X7F C11 C12 SING Y N 13
-MY-X7F C05 O14 DOUB N N 14
-MY-X7F C12 O13 SING N N 15
-MY-X7F C03 H1 SING N N 16
-MY-X7F C04 H2 SING N N 17
-MY-X7F C10 H3 SING N N 18
-MY-X7F C11 H4 SING N N 19
-MY-X7F O09 H5 SING N N 20
-MY-X7F O13 H6 SING N N 21
-#
-_pdbx_chem_comp_descriptor.type SMILES_CANONICAL
-_pdbx_chem_comp_descriptor.descriptor 'Oc1ccc(O)c2C(=O)C=CC(=O)c12'
+O01 C02 DOUB N
+O09 C08 SING N
+C02 C03 SING N
+C02 C07 SING N
+C03 C04 DOUB N
+C08 C07 DOUB Y
+C08 C10 SING Y
+C07 C06 SING Y
+C10 C11 DOUB Y
+C04 C05 SING N
+C06 C05 SING N
+C06 C12 DOUB Y
+C11 C12 SING Y
+C05 O14 DOUB N
+C12 O13 SING N
+C03 H1 SING N
+C04 H2 SING N
+C10 H3 SING N
+C11 H4 SING N
+O09 H5 SING N
+O13 H6 SING N
 #
 ```
+
+### Mandatory fields
+
+AlphaFold 3 needs only a subset of the fields that CCD uses. The mandatory
+fields are described below. Refer to
+[CCD documentation](https://www.wwpdb.org/data/ccd#mmcifFormat) for more
+detailed explanation of each field.
+
+**Singular fields (containing just a single value)**
+
+*   `_chem_comp.id`: The ID of the component. Must match the `_data` record and
+    must not contain special CIF characters (like `_` or `#`).
+*   `_chem_comp.name`: Optional full name of the component. If unknown, set to
+    `?`.
+*   `_chem_comp.type`: Type of the component, typically `non-polymer`.
+*   `_chem_comp.formula`: Optional component formula. If unknown, set to `?`.
+*   `_chem_comp.mon_nstd_parent_comp_id`: Optional parent component ID. If
+    unknown, set to `?`.
+*   `_chem_comp.pdbx_synonyms`: Optional synonym IDs. If unknown, set to `?`.
+*   `_chem_comp.formula_weight`: Optional weight of the component. If unknown,
+    set to `?`.
+
+**Per-atom fields (containing one record per atom)**
+
+*   `_chem_comp_atom.comp_id`: Component ID.
+*   `_chem_comp_atom.atom_id`: Atom ID.
+*   `_chem_comp_atom.type_symbol`: Atom element type.
+*   `_chem_comp_atom.charge`: Atom charge.
+*   `_chem_comp_atom.pdbx_leaving_atom_flag`: Flag determining whether this is a
+    leaving atom.
+*   `_chem_comp_atom.pdbx_model_Cartn_x_ideal`: Ideal x coordinate.
+*   `_chem_comp_atom.pdbx_model_Cartn_y_ideal`: Ideal y coordinate.
+*   `_chem_comp_atom.pdbx_model_Cartn_z_ideal`: Ideal z coordinate.
+
+**Per-bond fields (containing one record per bond)**
+
+*   `_chem_comp_bond.atom_id_1`: The ID of the first of the two atoms that
+    define the bond.
+*   `_chem_comp_bond.atom_id_2`: The ID of the second of the two atoms that
+    define the bond.
+*   `_chem_comp_bond.value_order`: The bond order of the chemical bond
+    associated with the specified atoms.
+*   `_chem_comp_bond.pdbx_aromatic_flag`: Whether the bond is aromatic.
 
 ## Full Example
 
@@ -794,7 +861,7 @@ certain fields and the sequences are not biologically meaningful.
   ],
   "userCCD": ...,
   "dialect": "alphafold3",
-  "version": 1
+  "version": 2
 }
 
 ```

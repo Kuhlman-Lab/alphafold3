@@ -17,6 +17,7 @@ from absl import logging
 from alphafold3.cpp import cif_dict
 import numpy as np
 import rdkit.Chem as rd_chem
+from rdkit.Chem import AllChem as rd_all_chem
 
 
 _RDKIT_MMCIF_TO_BOND_TYPE: Mapping[str, rd_chem.BondType] = {
@@ -519,3 +520,21 @@ def assign_atom_names_from_graph(
       atom.SetProp('atom_name', new_name)
 
   return mol
+
+
+def get_random_conformer(
+    mol: rd_chem.Mol,
+    random_seed: int,
+    logging_name: str,
+) -> rd_chem.Conformer | None:
+  """Stochastic conformer search method using V3 ETK."""
+  params = rd_all_chem.ETKDGv3()
+  params.randomSeed = random_seed
+  mol_copy = rd_chem.Mol(mol)
+  try:
+    conformer_id = rd_all_chem.EmbedMolecule(mol_copy, params)
+    conformer = mol_copy.GetConformer(conformer_id)
+  except ValueError:
+    logging.warning('Failed to generate conformer for: %s', logging_name)
+    conformer = None
+  return conformer

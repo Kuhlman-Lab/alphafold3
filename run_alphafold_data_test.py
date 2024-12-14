@@ -132,7 +132,7 @@ class DataPipelineTest(test_utils.StructureTestCase):
         / 'test_data/miniature_databases/rnacentral_active_seq_id_90_cov_80_linclust__subsampled_1000.fasta'
     ).path()
     pdb_database_path = testing_data.Data(
-        resources.ROOT / 'data/testdata/templates_v2/ww_pdb'
+        resources.ROOT / 'test_data/miniature_databases/pdb_mmcif'
     ).path()
     seqres_database_path = testing_data.Data(
         resources.ROOT
@@ -223,7 +223,7 @@ class DataPipelineTest(test_utils.StructureTestCase):
 
   def test_write_input_json(self):
     fold_input = folding_input.Input.from_json(self._test_input_json)
-    output_dir = self.create_tempdir()
+    output_dir = self.create_tempdir().full_path
     run_alphafold.write_fold_input_json(fold_input, output_dir)
     with open(
         os.path.join(output_dir, f'{fold_input.sanitised_name()}_data.json'),
@@ -235,7 +235,7 @@ class DataPipelineTest(test_utils.StructureTestCase):
 
   def test_process_fold_input_runs_only_data_pipeline(self):
     fold_input = folding_input.Input.from_json(self._test_input_json)
-    output_dir = self.create_tempdir()
+    output_dir = self.create_tempdir().full_path
     run_alphafold.process_fold_input(
         fold_input=fold_input,
         data_pipeline_config=self._data_pipeline_config,

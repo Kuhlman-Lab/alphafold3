@@ -1,0 +1,38 @@
+name: Continuous Integration
+
+on:
+  # Trigger the workflow on push or pull request, only on the main branch.
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: "build ${{ matrix.name-prefix }} (py ${{ matrix.python-version }} on ${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - name-prefix: "all tests"
+            python-version: '3.11'
+            os: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y hmmer
+        pip install --upgrade pip
+        pip install -r dev-requirements.txt
+        pip install --no-deps .
+        build_data
+    - name: Run CPU-only tests
+      run: |
+        python run_alphafold_data_test.py

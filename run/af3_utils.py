@@ -3,12 +3,12 @@ import time
 import argparse
 import datetime
 import tarfile
-from typing import Sequence, Dict, Any, Union, Tuple, Optional
+from typing import Sequence, Dict, Any, Union, Tuple, Optional, Iterator
 import json
 import pathlib
 import logging
 import requests
-from alphafold3.common.folding_input import Input, check_unique_sanitised_names, Template
+from alphafold3.common.folding_input import Input, Template
 from alphafold3.data import templates, structure_stores, msa_config
 from alphafold3.structure import from_mmcif
 
@@ -158,6 +158,15 @@ def get_af3_parser() -> FileArgumentParser:
         " exactly that number of tokens. Defaults to"
         " '256,512,768,1024,1280,1536,2048,2560,3072,3584,4096,4608,5120'."
     )
+    parser.add_argument(
+        "--cuda_compute_7x",
+        type=int,
+        default=0,
+        help="If using a GPU with CUDA compute capability of 7.x, you must"
+        " set this flag to 1. This will set "
+        " XLA_FLAGS='--xla_disable_hlo_passes=custom-kernel-fusion-rewriter'."
+        " Defaults to 0 (False)."
+    )
 
     return parser
 
@@ -183,6 +192,7 @@ def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
     
     # Reformat some of the arguments
     args.run_inference = binary_to_bool(args.run_inference)
+    args.cuda_compute_7x = binary_to_bool(args.cuda_compute_7x)
     args.buckets = sorted([int(b) for b in args.buckets.split(',')])
     args.run_data_pipeline = False # Kuhlman Lab installation handles MSAs and templates differently
     
@@ -212,13 +222,13 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
     else:
         # These defaults may need changed with future AF3 updates.
         set_if_absent(raw_json, 'dialect', 'alphafold3')
-        set_if_absent(raw_json, 'version', 1)
+        set_if_absent(raw_json, 'version', 2)
         
         # Set default values for empty MSAs and templates
         for sequence in raw_json['sequences']:
             if "protein" in sequence:
-                if 'unpairedMsa' in sequence['protein'] and 'templates' in sequence['protein']:
-                    # If both, unpairedMsa and templates are provided, use them and maybe set pairedMsa
+                if ('unpairedMsa' in sequence['protein'] or 'unpairedMsaPath' in sequence['protein']) and 'templates' in sequence['protein']:
+                    # If both unpairedMsa (or unpairedMsaPath) and templates are provided, use them and maybe set pairedMsa
                     pass
                 elif run_mmseqs:
                     # If we don't have unpairedMsa and templates and we want them, then use MMseqs
@@ -228,12 +238,18 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                         sequence['protein']['sequence'],
                         use_templates=True
                     )
-                    set_if_absent(sequence['protein'], 'unpairedMsa', a3m_path)
+                    if 'unpairedMsa' not in sequence['protein'] and 'unpairedMsaPath' not in sequence['protein']:
+                        set_if_absent(sequence['protein'], 'unpairedMsa', a3m_path)
                     set_if_absent(sequence['protein'], 'templates', [] if template_dir is None else template_dir)
                 else:
                     # Set empty values.
                     set_if_absent(sequence['protein'], 'unpairedMsa', '')
                     set_if_absent(sequence['protein'], 'templates', [])
+
+                if 'unpairedMsaPath' in sequence['protein']:
+                    # Move unpairedMsaPath to unpairedMsa for unified parsing of MSAs
+                    sequence['protein']['unpairedMsa'] = sequence['protein']['unpairedMsaPath']
+                    del sequence['protein']['unpairedMsaPath']
                     
                 if sequence['protein']['unpairedMsa'] != "" and os.path.exists(sequence['protein']['unpairedMsa']):
                     # If unpairedMsa isn't empty and is a path that exists, parse it as a custom MSA
@@ -258,7 +274,7 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
     return raw_json
 
 
-def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Sequence[Input]:
+def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Iterator[Input]:
     """Loads multiple fold inputs from a JSON path (or string of a JSON).
 
     Args:
@@ -271,8 +287,8 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
     Raises:
         ValueError: Fails if we cannot load json_path as an AlphaFold3 JSON
 
-    Returns:
-        Sequence[Input]: A list of folding inputs.
+    Yields:
+        The folding inputs.
     """
     # Update the json defaults before parsing it.
     if not isinstance(json_path, str):
@@ -283,7 +299,6 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
     raw_json = set_json_defaults(json_str, run_mmseqs, output_dir, max_template_date)
     json_str = json.dumps(raw_json)
 
-    fold_inputs = []
     if isinstance(raw_json, list):
         # AlphaFold Server JSON.
         logging.info(
@@ -295,7 +310,7 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
         logging.info('Loading %d fold jobs from %s', len(raw_json), json_path)
         for fold_job_idx, fold_job in enumerate(raw_json):
             try:
-                fold_inputs.append(Input.from_alphafoldserver_fold_job(fold_job))
+                yield Input.from_alphafoldserver_fold_job(fold_job)
             except ValueError as e:
                 raise ValueError(
                     f'Failed to load fold job {fold_job_idx} from {json_path}. The JSON'
@@ -309,7 +324,7 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
         )
         # AlphaFold 3 JSON.
         try:
-            fold_inputs.append(Input.from_json(json_str))
+            yield Input.from_json(json_str, json_path if not isinstance(json_path, str) else None)
         except ValueError as e:
             raise ValueError(
                 f'Failed to load fold input from {json_path}. The JSON at'
@@ -317,12 +332,8 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
                 ' top-level is not a list.'
             ) from e
 
-    check_unique_sanitised_names(fold_inputs)
 
-    return fold_inputs
-
-
-def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Sequence[Input]:
+def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Iterator[Input]:
     """Loads multiple fold inputs from all JSON files in a given input_dir.
 
     Args:
@@ -330,23 +341,15 @@ def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False,
         run_mmseqs (bool, optional): Whether to run MMseq2 on protein chains. Defaults to False.
         output_dir (str, optional): Place that'll store MMseqs2 MSAs and templates. Defaults to ''.
         max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
-
-    Returns:
+        
+    Yields:
         The fold inputs from all JSON files in the input directory.
-
-    Raises:
-        ValueError: If the fold inputs have non-unique sanitised names.
     """
-    fold_inputs = []
-    for file_path in input_dir.glob('*.json'):
+    for file_path in sorted(input_dir.glob('*.json')):
         if not file_path.is_file():
             continue
 
-        fold_inputs.extend(load_fold_inputs_from_path(file_path, run_mmseqs, output_dir, max_template_date))
-
-    check_unique_sanitised_names(fold_inputs)
-
-    return fold_inputs
+        yield from load_fold_inputs_from_path(file_path, run_mmseqs, output_dir, max_template_date)
 
 
 def run_mmseqs2(

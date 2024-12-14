@@ -135,15 +135,23 @@ def mmcif_to_info(mmcif: Mapping[str, Sequence[str]]) -> ComponentInfo:
     # A non-standard component, e.g. MSE.
     mon_nstd_flag = 'n'
 
-  pdbx_smiles = ''
-  descriptor_types = mmcif['_pdbx_chem_comp_descriptor.type']
-  descriptors = mmcif['_pdbx_chem_comp_descriptor.descriptor']
-  for descriptor_type, descriptor in zip(descriptor_types, descriptors):
+  # Default SMILES is the canonical SMILES, but we fall back to the SMILES if a
+  # canonical SMILES is not available. Of canonical SMILES, we prefer ones from
+  # the OpenEye OEToolkits program.
+  canonical_pdbx_smiles = ''
+  fallback_pdbx_smiles = ''
+  descriptor_types = mmcif.get('_pdbx_chem_comp_descriptor.type', [])
+  descriptors = mmcif.get('_pdbx_chem_comp_descriptor.descriptor', [])
+  programs = mmcif.get('_pdbx_chem_comp_descriptor.program', [])
+  for descriptor_type, descriptor, program in zip(
+      descriptor_types, descriptors, programs
+  ):
     if descriptor_type == 'SMILES_CANONICAL':
-      pdbx_smiles = descriptor
-      break
-    elif not pdbx_smiles and descriptor_type == 'SMILES':
-      pdbx_smiles = descriptor
+      if (not canonical_pdbx_smiles) or program == 'OpenEye OEToolkits':
+        canonical_pdbx_smiles = descriptor
+    if not fallback_pdbx_smiles and descriptor_type == 'SMILES':
+      fallback_pdbx_smiles = descriptor
+  pdbx_smiles = canonical_pdbx_smiles or fallback_pdbx_smiles
 
   return ComponentInfo(
       name=front_or_empty(names),

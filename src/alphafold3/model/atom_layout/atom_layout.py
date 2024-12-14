@@ -22,6 +22,7 @@ from alphafold3.constants import chemical_component_sets
 from alphafold3.constants import chemical_components
 from alphafold3.constants import mmcif_names
 from alphafold3.constants import residue_names
+from alphafold3.data.tools import rdkit_utils
 from alphafold3.structure import chemical_components as struc_chem_comps
 import jax.numpy as jnp
 import numpy as np
@@ -30,45 +31,6 @@ from rdkit import Chem
 
 xnp_ndarray: TypeAlias = np.ndarray | jnp.ndarray  # pylint: disable=invalid-name
 NumpyIndex: TypeAlias = Any
-
-
-def _assign_atom_names_from_graph(mol: Chem.Mol) -> Chem.Mol:
-  """Assigns atom names from the molecular graph.
-
-  The atom name is stored as an atom property 'atom_name', accessible with
-  atom.GetProp('atom_name'). If the property is already specified, we keep the
-  original name.
-
-  We traverse the graph in the order of the rdkit atom index and give each atom
-  a name equal to '{ELEMENT_TYPE}_{INDEX}'. E.g. C5 is the name for the fifth
-  unnamed carbon encountered.
-
-  NOTE: A new mol is returned, the original is not changed in place.
-
-  Args:
-    mol: RDKit molecule.
-
-  Returns:
-    A new mol, with potentially new 'atom_name' properties.
-  """
-  mol = Chem.Mol(mol)
-
-  specified_atom_names = {
-      a.GetProp('atom_name') for a in mol.GetAtoms() if a.HasProp('atom_name')
-  }
-
-  element_counts = collections.Counter()
-  for atom in mol.GetAtoms():
-    if not atom.HasProp('atom_name'):
-      element = atom.GetSymbol()
-      while True:
-        element_counts[element] += 1
-        new_name = f'{element}{element_counts[element]}'
-        if new_name not in specified_atom_names:
-          break
-      atom.SetProp('atom_name', new_name)
-
-  return mol
 
 
 @dataclasses.dataclass(frozen=True)
@@ -836,7 +798,15 @@ def make_flat_atom_layout(
     elif residues.smiles_string[idx]:
       # Get atoms from RDKit via SMILES.
       mol = Chem.MolFromSmiles(residues.smiles_string[idx])
-      mol = _assign_atom_names_from_graph(mol)
+      if mol is None:
+        raise ValueError(
+            f'Failed to construct RDKit Mol for {residues.res_name[idx]} from'
+            f' SMILES string: {residues.smiles_string[idx]} . This is likely'
+            ' due to an issue with the SMILES string. Note that the userCCD'
+            ' input format provides an alternative way to define custom'
+            ' molecules directly without RDKit or SMILES.'
+        )
+      mol = rdkit_utils.assign_atom_names_from_graph(mol)
       atom_names_elements = [
           (a.GetProp('atom_name'), a.GetSymbol()) for a in mol.GetAtoms()
       ]

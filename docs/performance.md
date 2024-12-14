@@ -98,16 +98,28 @@ AlphaFold 3 can run on inputs of size up to 4,352 tokens on a single NVIDIA A100
 While numerically accurate, this configuration will have lower throughput
 compared to the set up on the NVIDIA A100 (80 GB), due to less available memory.
 
+#### NVIDIA V100
+
+There are known numerical issues with CUDA Capability 7.x devices. To work
+around the issue, set the ENV XLA_FLAGS to include
+`--xla_disable_hlo_passes=custom-kernel-fusion-rewriter`.
+
+With the above flag set, AlphaFold 3 can run on inputs of size up to 1,280
+tokens on a single NVIDIA V100 using [unified memory](#unified-memory).
+
 #### NVIDIA P100
 
 AlphaFold 3 can run on inputs of size up to 1,024 tokens on a single NVIDIA P100
 with no configuration changes needed.
 
-#### NVIDIA V100
+#### Other devices
 
-There are known issues with V100 devices. See
-[this Issue](https://github.com/google-deepmind/alphafold3/issues/59) for
-tracking.
+Large-scale numerical tests have not been performed on any other devices but
+they are believed to be numerically accurate.
+
+There are known numerical issues with CUDA Capability 7.x devices. To work
+around the issue, set the environment variable `XLA_FLAGS` to include
+`--xla_disable_hlo_passes=custom-kernel-fusion-rewriter`.
 
 #### Other devices
 
@@ -164,6 +176,17 @@ in the provided `Dockerfile`).
 
 ```sh
 ENV XLA_FLAGS="--xla_gpu_enable_triton_gemm=false"
+```
+
+### CUDA Capability 7.x GPUs
+
+For all CUDA Capability 7.x GPUs (e.g. V100) the environment variable
+`XLA_FLAGS` must be changed to include
+`--xla_disable_hlo_passes=custom-kernel-fusion-rewriter`. Disabling the Tritron
+GEMM kernels is not necessary as they are not supported for such GPUs.
+
+```sh
+ENV XLA_FLAGS="--xla_disable_hlo_passes=custom-kernel-fusion-rewriter"
 ```
 
 ### GPU Memory

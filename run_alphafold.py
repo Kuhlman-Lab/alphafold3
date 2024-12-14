@@ -645,13 +645,14 @@ def main(_):
             ' https://developer.nvidia.com/cuda-gpus).'
         )
       elif 7.0 <= compute_capability < 8.0:
-        raise ValueError(
-            'There are currently known unresolved numerical issues with using'
-            ' devices with GPU compute capability 7.x (see'
-            ' https://developer.nvidia.com/cuda-gpus). Follow '
-            ' https://github.com/google-deepmind/alphafold3/issues/59 for'
-            ' tracking.'
-        )
+        xla_flags = os.environ.get('XLA_FLAGS')
+        required_flag = '--xla_disable_hlo_passes=custom-kernel-fusion-rewriter'
+        if not xla_flags or required_flag not in xla_flags:
+          raise ValueError(
+              'For devices with GPU compute capability 7.x (see'
+              ' https://developer.nvidia.com/cuda-gpus) the ENV XLA_FLAGS must'
+              f' include "{required_flag}".'
+          )
 
   notice = textwrap.wrap(
       'Running AlphaFold 3. Please note that standard AlphaFold 3 model'
@@ -714,8 +715,10 @@ def main(_):
     print('Skipping running model inference.')
     model_runner = None
 
-  print(f'Processing {len(fold_inputs)} fold inputs.')
+  print('Processing fold inputs.')
+  num_fold_inputs = 0
   for fold_input in fold_inputs:
+    print(f'Processing fold input #{num_fold_inputs + 1}')
     process_fold_input(
         fold_input=fold_input,
         data_pipeline_config=data_pipeline_config,
@@ -723,8 +726,9 @@ def main(_):
         output_dir=os.path.join(_OUTPUT_DIR.value, fold_input.sanitised_name()),
         buckets=tuple(int(bucket) for bucket in _BUCKETS.value),
     )
+    num_fold_inputs += 1
 
-  print(f'Done processing {len(fold_inputs)} fold inputs.')
+  print(f'Done processing {num_fold_inputs} fold inputs.')
 
 
 if __name__ == '__main__':

@@ -776,7 +776,9 @@ def _parse_hit_metadata(
   try:
     cif = mmcif.from_string(structure_store.get_mmcif_str(pdb_id))
   except structure_stores.NotFoundError:
-    logging.warning('Failed to get mmCIF for %s.', pdb_id)
+    logging.warning(
+        'Failed to get mmCIF for %s (author chain %s).', pdb_id, auth_chain_id
+    )
     return None, None, None
   release_date = mmcif.get_release_date(cif)
 
