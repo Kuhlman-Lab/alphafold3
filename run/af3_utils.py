@@ -158,6 +158,15 @@ def get_af3_parser() -> FileArgumentParser:
         " exactly that number of tokens. Defaults to"
         " '256,512,768,1024,1280,1536,2048,2560,3072,3584,4096,4608,5120'."
     )
+    parser.add_argument(
+        "--cuda_compute_7x",
+        type=int,
+        default=0,
+        help="If using a GPU with CUDA compute capability of 7.x, you must"
+        " set this flag to 1. This will set "
+        " XLA_FLAGS='--xla_disable_hlo_passes=custom-kernel-fusion-rewriter'."
+        " Defaults to 0 (False)."
+    )
 
     return parser
 
@@ -183,6 +192,7 @@ def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
     
     # Reformat some of the arguments
     args.run_inference = binary_to_bool(args.run_inference)
+    args.cuda_compute_7x = binary_to_bool(args.cuda_compute_7x)
     args.buckets = sorted([int(b) for b in args.buckets.split(',')])
     args.run_data_pipeline = False # Kuhlman Lab installation handles MSAs and templates differently
     
