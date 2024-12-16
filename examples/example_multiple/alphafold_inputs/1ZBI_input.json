@@ -1,0 +1,30 @@
+{
+    "name": "1ZBI",
+    "sequences": [
+      {
+        "protein": {
+          "id": ["A", "B"],
+          "sequence": "GSHMAKEEIIWESLSVDVGSQGNPGIVEYKGVDTKTGEVLFEREPIPIGTNNMGEFLAIVHGLRYLKERNSRKPIYSNSQTAIKWVKDKKAKSTLVRNEETALIWKLVDEAEEWLNTHTYETPILKWQTDKWGEIKADYGRK"
+        }
+      },
+      {
+        "rna": {
+          "id": ["C"],
+          "sequence": "GACACCUGAUUC"
+        }
+      },
+      {
+        "dna": {
+          "id": ["D"],
+          "sequence": "GAATCAGGTGTC"
+        }
+      },
+      {
+        "ligand": {
+          "id": ["E", "F", "G", "H"],
+          "ccdCodes": ["MG"]
+        }
+      }
+    ],
+    "modelSeeds": [1]
+  }
