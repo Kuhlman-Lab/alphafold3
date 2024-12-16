@@ -4,5 +4,8 @@ __pycache__/
 # Ignore AF3 prediction folders (only track the tarball)
 af3_preds*/
 
+# Ignore template_db.a3m files
+template_db.a3m
+
 # Ignore models directory that contains AF3 weights
 models/
