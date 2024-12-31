@@ -88,6 +88,15 @@ def get_af3_parser() -> FileArgumentParser:
         help="Path to a directory where the results will be saved."
     )
     
+    # Output control.
+    parser.add_argument(
+        "--save_embeddings",
+        type=int,
+        default=0,
+        help="Whether to save the final trunk single and pair embeddings in "
+        "the output. Defaults to 0 (False)"
+    )
+
     # Model arguments.
     parser.add_argument(
         "--model_dir",
@@ -139,6 +148,15 @@ def get_af3_parser() -> FileArgumentParser:
         default='3000-01-01', # Set in far future.
         help="Maximum template release date to consider. Format: YYYY-MM-DD. "
         "All templates released after this date will be ignored."
+    )
+
+    # Conformer generation.
+    parser.add_argument(
+        "--conformer_max_iterations",
+        type=int,
+        default=None,  # Default to RDKit default parameters value.
+        help="Optional override for maximum number of iterations to run for RDKit "
+        "conformer search."
     )
 
     # Compilation arguments.
@@ -193,6 +211,7 @@ def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
     # Reformat some of the arguments
     args.run_inference = binary_to_bool(args.run_inference)
     args.cuda_compute_7x = binary_to_bool(args.cuda_compute_7x)
+    args.save_embeddings = binary_to_bool(args.save_embeddings)
     args.buckets = sorted([int(b) for b in args.buckets.split(',')])
     args.run_data_pipeline = False # Kuhlman Lab installation handles MSAs and templates differently
     
@@ -301,12 +320,6 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
 
     if isinstance(raw_json, list):
         # AlphaFold Server JSON.
-        logging.info(
-            'Detected %s is an AlphaFold Server JSON since the top-level is a'
-            ' list.',
-            json_path,
-        )
-
         logging.info('Loading %d fold jobs from %s', len(raw_json), json_path)
         for fold_job_idx, fold_job in enumerate(raw_json):
             try:
@@ -314,22 +327,16 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
             except ValueError as e:
                 raise ValueError(
                     f'Failed to load fold job {fold_job_idx} from {json_path}. The JSON'
-                    f' at {json_path} was detected to be an AlphaFold Server JSON since'
-                    ' the top-level is a list.'
+                    ' was detected to be the AlphaFold Server dialect.'
                 ) from e
     else:
-        logging.info(
-            'Detected %s is an AlphaFold 3 JSON since the top-level is not a list.',
-            json_path,
-        )
         # AlphaFold 3 JSON.
         try:
             yield Input.from_json(json_str, json_path if not isinstance(json_path, str) else None)
         except ValueError as e:
             raise ValueError(
-                f'Failed to load fold input from {json_path}. The JSON at'
-                f' {json_path} was detected to be an AlphaFold 3 JSON since the'
-                ' top-level is not a list.'
+                f'Failed to load fold input from {json_path}. The JSON was detected'
+                f' to be the AlphaFold 3 dialect.'
             ) from e
 
 
