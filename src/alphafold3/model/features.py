@@ -1477,6 +1477,7 @@ def get_reference(
     ccd: chemical_components.Ccd,
     random_state: np.random.RandomState,
     ref_max_modified_date: datetime.date,
+    conformer_max_iterations: int | None,
 ) -> tuple[dict[str, Any], Any, Any]:
   """Reference structure for residue from CCD or SMILES.
 
@@ -1491,6 +1492,8 @@ def get_reference(
     random_state: Numpy RandomState
     ref_max_modified_date: date beyond which reference structures must not be
       modified to be allowed to use reference coordinates.
+    conformer_max_iterations: Optional override for maximum number of iterations
+      to run for RDKit conformer search.
 
   Returns:
     Mapping from atom names to features, from_atoms, dest_atoms.
@@ -1541,7 +1544,10 @@ def get_reference(
   if mol is not None:
     conformer_random_seed = int(random_state.randint(1, 1 << 31))
     conformer = rdkit_utils.get_random_conformer(
-        mol=mol, random_seed=conformer_random_seed, logging_name=res_name
+        mol=mol,
+        random_seed=conformer_random_seed,
+        max_iterations=conformer_max_iterations,
+        logging_name=res_name,
     )
     if conformer:
       for idx, atom in enumerate(mol.GetAtoms()):
@@ -1617,6 +1623,7 @@ class RefStructure:
       chemical_components_data: struc_chem_comps.ChemicalComponentsData,
       random_state: np.random.RandomState,
       ref_max_modified_date: datetime.date,
+      conformer_max_iterations: int | None,
       ligand_ligand_bonds: atom_layout.AtomLayout | None = None,
   ) -> tuple[Self, Any]:
     """Reference structure information for each residue."""
@@ -1655,6 +1662,7 @@ class RefStructure:
               ccd=ccd,
               random_state=random_state,
               ref_max_modified_date=ref_max_modified_date,
+              conformer_max_iterations=conformer_max_iterations,
           )
           conformations[(chain_id, res_id)] = conf
 

@@ -525,11 +525,14 @@ def assign_atom_names_from_graph(
 def get_random_conformer(
     mol: rd_chem.Mol,
     random_seed: int,
+    max_iterations: int | None,
     logging_name: str,
 ) -> rd_chem.Conformer | None:
   """Stochastic conformer search method using V3 ETK."""
   params = rd_all_chem.ETKDGv3()
   params.randomSeed = random_seed
+  if max_iterations is not None:  # Override default value.
+    params.maxIterations = max_iterations
   mol_copy = rd_chem.Mol(mol)
   try:
     conformer_id = rd_all_chem.EmbedMolecule(mol_copy, params)

@@ -32,7 +32,8 @@ ENV PATH="/hmmer/bin:/alphafold3_venv/bin:$PATH"
 RUN pip3 install --upgrade pip
 
 # Install HMMER. Do so before copying the source code, so that docker can cache
-# the image layer containing HMMER.
+# the image layer containing HMMER. Alternatively, you could also install it 
+# using `apt-get install hmmer` instead of bulding it from source.
 RUN mkdir /hmmer_build /hmmer ; \
     wget http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz --directory-prefix /hmmer_build ; \
     (cd /hmmer_build && tar zxf hmmer-3.4.tar.gz && rm hmmer-3.4.tar.gz) ; \

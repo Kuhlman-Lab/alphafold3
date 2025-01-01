@@ -87,7 +87,7 @@ class Template:
 
   __slots__ = ('_mmcif', '_query_to_template')
 
-  def __init__(self, mmcif: str, query_to_template_map: Mapping[int, int]):
+  def __init__(self, *, mmcif: str, query_to_template_map: Mapping[int, int]):
     """Initializes the template.
 
     Args:
@@ -119,63 +119,124 @@ class Template:
     return mmcifs_equal and maps_equal
 
 
-@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
 class ProteinChain:
-  """Protein chain input.
+  """Protein chain input."""
 
-  Attributes:
-    id: Unique protein chain identifier.
-    sequence: The amino acid sequence of the chain.
-    ptms: A list of tuples containing the post-translational modification type
-      and the (1-based) residue index where the modification is applied.
-    paired_msa: Paired A3M-formatted MSA for this chain. This MSA is not
-      deduplicated and will be used to compute paired features. If None, this
-      field is unset and must be filled in by the data pipeline before
-      featurisation. If set to an empty string, it will be treated as a custom
-      MSA with no sequences.
-    unpaired_msa: Unpaired A3M-formatted MSA for this chain. This will be
-      deduplicated and used to compute unpaired features. If None, this field is
-      unset and must be filled in by the data pipeline before featurisation. If
-      set to an empty string, it will be treated as a custom MSA with no
-      sequences.
-    templates: A list of structural templates for this chain. If None, this
-      field is unset and must be filled in by the data pipeline before
-      featurisation. The list can be empty or contain up to 20 templates.
-  """
+  __slots__ = (
+      '_id',
+      '_sequence',
+      '_ptms',
+      '_paired_msa',
+      '_unpaired_msa',
+      '_templates',
+  )
 
-  id: str
-  sequence: str
-  ptms: Sequence[tuple[str, int]]
-  paired_msa: str | None = None
-  unpaired_msa: str | None = None
-  templates: Sequence[Template] | None = None
+  def __init__(
+      self,
+      *,
+      id: str,  # pylint: disable=redefined-builtin
+      sequence: str,
+      ptms: Sequence[tuple[str, int]],
+      paired_msa: str | None = None,
+      unpaired_msa: str | None = None,
+      templates: Sequence[Template] | None = None,
+  ):
+    """Initializes a single protein chain input.
 
-  def __post_init__(self):
-    if not all(res.isalpha() for res in self.sequence):
+    Args:
+      id: Unique protein chain identifier.
+      sequence: The amino acid sequence of the chain.
+      ptms: A list of tuples containing the post-translational modification type
+        and the (1-based) residue index where the modification is applied.
+      paired_msa: Paired A3M-formatted MSA for this chain. This MSA is not
+        deduplicated and will be used to compute paired features. If None, this
+        field is unset and must be filled in by the data pipeline before
+        featurisation. If set to an empty string, it will be treated as a custom
+        MSA with no sequences.
+      unpaired_msa: Unpaired A3M-formatted MSA for this chain. This will be
+        deduplicated and used to compute unpaired features. If None, this field
+        is unset and must be filled in by the data pipeline before
+        featurisation. If set to an empty string, it will be treated as a custom
+        MSA with no sequences.
+      templates: A list of structural templates for this chain. If None, this
+        field is unset and must be filled in by the data pipeline before
+        featurisation. The list can be empty or contain up to 20 templates.
+    """
+    if not all(res.isalpha() for res in sequence):
+      raise ValueError(f'Protein must contain only letters, got "{sequence}"')
+    if any(not 0 < mod[1] <= len(sequence) for mod in ptms):
+      raise ValueError(f'Invalid protein modification index: {ptms}')
+    if any(mod[0].startswith('CCD_') for mod in ptms):
       raise ValueError(
-          f'Protein must contain only letters, got "{self.sequence}"'
+          f'Protein ptms must not contain the "CCD_" prefix, got {ptms}'
       )
-    if any(not 0 < mod[1] <= len(self.sequence) for mod in self.ptms):
-      raise ValueError(f'Invalid protein modification index: {self.ptms}')
-    if any(mod[0].startswith('CCD_') for mod in self.ptms):
-      raise ValueError(
-          f'Protein ptms must not contain the "CCD_" prefix, got {self.ptms}'
-      )
+    # Use hashable containers for ptms and templates.
+    self._id = id
+    self._sequence = sequence
+    self._ptms = tuple(ptms)
+    self._paired_msa = paired_msa
+    self._unpaired_msa = unpaired_msa
+    self._templates = tuple(templates) if templates is not None else None
 
-    # Use hashable types for ptms and templates.
-    if self.ptms is not None:
-      object.__setattr__(self, 'ptms', tuple(self.ptms))
-    if self.templates is not None:
-      object.__setattr__(self, 'templates', tuple(self.templates))
+  @property
+  def id(self) -> str:
+    return self._id
+
+  @property
+  def sequence(self) -> str:
+    """Returns a single-letter sequence, taking modifications into account.
+
+    Uses 'X' for all unknown residues.
+    """
+    return ''.join([
+        residue_names.letters_three_to_one(r, default='X')
+        for r in self.to_ccd_sequence()
+    ])
+
+  @property
+  def ptms(self) -> Sequence[tuple[str, int]]:
+    return self._ptms
+
+  @property
+  def paired_msa(self) -> str | None:
+    return self._paired_msa
+
+  @property
+  def unpaired_msa(self) -> str | None:
+    return self._unpaired_msa
+
+  @property
+  def templates(self) -> Sequence[Template] | None:
+    return self._templates
+
+  def __eq__(self, other: Self) -> bool:
+    return (
+        self._id == other._id
+        and self._sequence == other._sequence
+        and self._ptms == other._ptms
+        and self._paired_msa == other._paired_msa
+        and self._unpaired_msa == other._unpaired_msa
+        and self._templates == other._templates
+    )
+
+  def __hash__(self) -> int:
+    return hash((
+        self._id,
+        self._sequence,
+        self._ptms,
+        self._paired_msa,
+        self._unpaired_msa,
+        self._templates,
+    ))
 
   def hash_without_id(self) -> int:
     """Returns a hash ignoring the ID - useful for deduplication."""
     return hash((
-        self.sequence,
-        self.ptms,
-        self.paired_msa,
-        self.unpaired_msa,
-        self.templates,
+        self._sequence,
+        self._ptms,
+        self._paired_msa,
+        self._unpaired_msa,
+        self._templates,
     ))
 
   @classmethod
@@ -277,7 +338,7 @@ class ProteinChain:
       self, seq_id: str | Sequence[str] | None = None
   ) -> Mapping[str, Mapping[str, Any]]:
     """Converts ProteinChain to an AlphaFold JSON dict."""
-    if self.templates is None:
+    if self._templates is None:
       templates = None
     else:
       templates = [
@@ -288,16 +349,16 @@ class ProteinChain:
                   list(template.query_to_template_map.values()) or None
               ),
           }
-          for template in self.templates
+          for template in self._templates
       ]
     contents = {
-        'id': seq_id or self.id,
-        'sequence': self.sequence,
+        'id': seq_id or self._id,
+        'sequence': self._sequence,
         'modifications': [
-            {'ptmType': ptm[0], 'ptmPosition': ptm[1]} for ptm in self.ptms
+            {'ptmType': ptm[0], 'ptmPosition': ptm[1]} for ptm in self._ptms
         ],
-        'unpairedMsa': self.unpaired_msa,
-        'pairedMsa': self.paired_msa,
+        'unpairedMsa': self._unpaired_msa,
+        'pairedMsa': self._paired_msa,
         'templates': templates,
     }
     return {'protein': contents}
@@ -306,60 +367,104 @@ class ProteinChain:
     """Converts to a sequence of CCD codes."""
     ccd_coded_seq = [
         residue_names.PROTEIN_COMMON_ONE_TO_THREE.get(res, residue_names.UNK)
-        for res in self.sequence
+        for res in self._sequence
     ]
-    for ptm_code, ptm_index in self.ptms:
+    for ptm_code, ptm_index in self._ptms:
       ccd_coded_seq[ptm_index - 1] = ptm_code
     return ccd_coded_seq
 
   def fill_missing_fields(self) -> Self:
     """Fill missing MSA and template fields with default values."""
-    return dataclasses.replace(
-        self,
-        unpaired_msa=self.unpaired_msa or '',
-        paired_msa=self.paired_msa or '',
-        templates=self.templates or [],
+    return ProteinChain(
+        id=self.id,
+        sequence=self._sequence,
+        ptms=self._ptms,
+        unpaired_msa=self._unpaired_msa or '',
+        paired_msa=self._paired_msa or '',
+        templates=self._templates or [],
     )
 
 
-@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
 class RnaChain:
-  """RNA chain input.
+  """RNA chain input."""
 
-  Attributes:
-    id: Unique RNA chain identifier.
-    sequence: The RNA sequence of the chain.
-    modifications: A list of tuples containing the modification type and the
-      (1-based) residue index where the modification is applied.
-    unpaired_msa: Unpaired A3M-formatted MSA for this chain. This will be
-      deduplicated and used to compute unpaired features. If None, this field is
-      unset and must be filled in by the data pipeline before featurisation. If
-      set to an empty string, it will be treated as a custom MSA with no
-      sequences.
-  """
+  __slots__ = ('_id', '_sequence', '_modifications', '_unpaired_msa')
 
-  id: str
-  sequence: str
-  modifications: Sequence[tuple[str, int]]
-  unpaired_msa: str | None = None
+  def __init__(
+      self,
+      *,
+      id: str,  # pylint: disable=redefined-builtin
+      sequence: str,
+      modifications: Sequence[tuple[str, int]],
+      unpaired_msa: str | None = None,
+  ):
+    """Initializes a single strand RNA chain input.
 
-  def __post_init__(self):
-    if not all(res.isalpha() for res in self.sequence):
-      raise ValueError(f'RNA must contain only letters, got "{self.sequence}"')
-    if any(not 0 < mod[1] <= len(self.sequence) for mod in self.modifications):
-      raise ValueError(f'Invalid RNA modification index: {self.modifications}')
-    if any(mod[0].startswith('CCD_') for mod in self.modifications):
+    Args:
+      id: Unique RNA chain identifier.
+      sequence: The RNA sequence of the chain.
+      modifications: A list of tuples containing the modification type and the
+        (1-based) residue index where the modification is applied.
+      unpaired_msa: Unpaired A3M-formatted MSA for this chain. This will be
+        deduplicated and used to compute unpaired features. If None, this field
+        is unset and must be filled in by the data pipeline before
+        featurisation. If set to an empty string, it will be treated as a custom
+        MSA with no sequences.
+    """
+    if not all(res.isalpha() for res in sequence):
+      raise ValueError(f'RNA must contain only letters, got "{sequence}"')
+    if any(not 0 < mod[1] <= len(sequence) for mod in modifications):
+      raise ValueError(f'Invalid RNA modification index: {modifications}')
+    if any(mod[0].startswith('CCD_') for mod in modifications):
       raise ValueError(
           'RNA modifications must not contain the "CCD_" prefix, got'
-          f' {self.modifications}'
+          f' {modifications}'
       )
+    self._id = id
+    self._sequence = sequence
+    # Use hashable container for modifications.
+    self._modifications = tuple(modifications)
+    self._unpaired_msa = unpaired_msa
 
-    # Use hashable types for modifications.
-    object.__setattr__(self, 'modifications', tuple(self.modifications))
+  @property
+  def id(self) -> str:
+    return self._id
+
+  @property
+  def sequence(self) -> str:
+    """Returns a single-letter sequence, taking modifications into account.
+
+    Uses 'N' for all unknown residues.
+    """
+    return ''.join([
+        residue_names.letters_three_to_one(r, default='N')
+        for r in self.to_ccd_sequence()
+    ])
+
+  @property
+  def modifications(self) -> Sequence[tuple[str, int]]:
+    return self._modifications
+
+  @property
+  def unpaired_msa(self) -> str | None:
+    return self._unpaired_msa
+
+  def __eq__(self, other: Self) -> bool:
+    return (
+        self._id == other._id
+        and self._sequence == other._sequence
+        and self._modifications == other._modifications
+        and self._unpaired_msa == other._unpaired_msa
+    )
+
+  def __hash__(self) -> int:
+    return hash(
+        (self._id, self._sequence, self._modifications, self._unpaired_msa)
+    )
 
   def hash_without_id(self) -> int:
     """Returns a hash ignoring the ID - useful for deduplication."""
-    return hash((self.sequence, self.modifications, self.unpaired_msa))
+    return hash((self._sequence, self._modifications, self._unpaired_msa))
 
   @classmethod
   def from_alphafoldserver_dict(
@@ -412,13 +517,13 @@ class RnaChain:
   ) -> Mapping[str, Mapping[str, Any]]:
     """Converts RnaChain to an AlphaFold JSON dict."""
     contents = {
-        'id': seq_id or self.id,
-        'sequence': self.sequence,
+        'id': seq_id or self._id,
+        'sequence': self._sequence,
         'modifications': [
             {'modificationType': mod[0], 'basePosition': mod[1]}
-            for mod in self.modifications
+            for mod in self._modifications
         ],
-        'unpairedMsa': self.unpaired_msa,
+        'unpairedMsa': self._unpaired_msa,
     }
     return {'rna': contents}
 
@@ -426,49 +531,87 @@ class RnaChain:
     """Converts to a sequence of CCD codes."""
     mapping = {r: r for r in residue_names.RNA_TYPES}  # Same 1-letter and CCD.
     ccd_coded_seq = [
-        mapping.get(res, residue_names.UNK_RNA) for res in self.sequence
+        mapping.get(res, residue_names.UNK_RNA) for res in self._sequence
     ]
-    for ccd_code, modification_index in self.modifications:
+    for ccd_code, modification_index in self._modifications:
       ccd_coded_seq[modification_index - 1] = ccd_code
     return ccd_coded_seq
 
   def fill_missing_fields(self) -> Self:
     """Fill missing MSA fields with default values."""
-    return dataclasses.replace(self, unpaired_msa=self.unpaired_msa or '')
+    return RnaChain(
+        id=self.id,
+        sequence=self.sequence,
+        modifications=self.modifications,
+        unpaired_msa=self._unpaired_msa or '',
+    )
 
 
-@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
 class DnaChain:
-  """Single strand DNA chain input.
+  """Single strand DNA chain input."""
 
-  Attributes:
-    id: Unique DNA chain identifier.
-    sequence: The DNA sequence of the chain.
-    modifications: A list of tuples containing the modification type and the
-      (1-based) residue index where the modification is applied.
-  """
+  __slots__ = ('_id', '_sequence', '_modifications')
 
-  id: str
-  sequence: str
-  modifications: Sequence[tuple[str, int]]
+  def __init__(
+      self,
+      *,
+      id: str,  # pylint: disable=redefined-builtin
+      sequence: str,
+      modifications: Sequence[tuple[str, int]],
+  ):
+    """Initializes a single strand DNA chain input.
 
-  def __post_init__(self):
-    if not all(res.isalpha() for res in self.sequence):
-      raise ValueError(f'DNA must contain only letters, got "{self.sequence}"')
-    if any(not 0 < mod[1] <= len(self.sequence) for mod in self.modifications):
-      raise ValueError(f'Invalid DNA modification index: {self.modifications}')
-    if any(mod[0].startswith('CCD_') for mod in self.modifications):
+    Args:
+      id: Unique DNA chain identifier.
+      sequence: The DNA sequence of the chain.
+      modifications: A list of tuples containing the modification type and the
+        (1-based) residue index where the modification is applied.
+    """
+    if not all(res.isalpha() for res in sequence):
+      raise ValueError(f'DNA must contain only letters, got "{sequence}"')
+    if any(not 0 < mod[1] <= len(sequence) for mod in modifications):
+      raise ValueError(f'Invalid DNA modification index: {modifications}')
+    if any(mod[0].startswith('CCD_') for mod in modifications):
       raise ValueError(
           'DNA modifications must not contain the "CCD_" prefix, got'
-          f' {self.modifications}'
+          f' {modifications}'
       )
+    self._id = id
+    self._sequence = sequence
+    # Use hashable container for modifications.
+    self._modifications = tuple(modifications)
 
-    # Use hashable types for modifications.
-    object.__setattr__(self, 'modifications', tuple(self.modifications))
+  @property
+  def id(self) -> str:
+    return self._id
+
+  @property
+  def sequence(self) -> str:
+    """Returns a single-letter sequence, taking modifications into account.
+
+    Uses 'N' for all unknown residues.
+    """
+    return ''.join([
+        residue_names.letters_three_to_one(r, default='N')
+        for r in self.to_ccd_sequence()
+    ])
+
+  def __eq__(self, other: Self) -> bool:
+    return (
+        self._id == other._id
+        and self._sequence == other._sequence
+        and self._modifications == other._modifications
+    )
+
+  def __hash__(self) -> int:
+    return hash((self._id, self._sequence, self._modifications))
+
+  def modifications(self) -> Sequence[tuple[str, int]]:
+    return self._modifications
 
   def hash_without_id(self) -> int:
     """Returns a hash ignoring the ID - useful for deduplication."""
-    return hash((self.sequence, self.modifications))
+    return hash((self._sequence, self._modifications))
 
   @classmethod
   def from_alphafoldserver_dict(
@@ -506,11 +649,11 @@ class DnaChain:
   ) -> Mapping[str, Mapping[str, Any]]:
     """Converts DnaChain to an AlphaFold JSON dict."""
     contents = {
-        'id': seq_id or self.id,
-        'sequence': self.sequence,
+        'id': seq_id or self._id,
+        'sequence': self._sequence,
         'modifications': [
             {'modificationType': mod[0], 'basePosition': mod[1]}
-            for mod in self.modifications
+            for mod in self._modifications
         ],
     }
     return {'dna': contents}
@@ -519,9 +662,9 @@ class DnaChain:
     """Converts to a sequence of CCD codes."""
     ccd_coded_seq = [
         residue_names.DNA_COMMON_ONE_TO_TWO.get(res, residue_names.UNK_DNA)
-        for res in self.sequence
+        for res in self._sequence
     ]
-    for ccd_code, modification_index in self.modifications:
+    for ccd_code, modification_index in self._modifications:
       ccd_coded_seq[modification_index - 1] = ccd_code
     return ccd_coded_seq
 
@@ -1180,12 +1323,6 @@ def load_fold_inputs_from_path(json_path: pathlib.Path) -> Iterator[Input]:
 
   if isinstance(raw_json, list):
     # AlphaFold Server JSON.
-    logging.info(
-        'Detected %s is an AlphaFold Server JSON since the top-level is a'
-        ' list.',
-        json_path,
-    )
-
     logging.info('Loading %d fold jobs from %s', len(raw_json), json_path)
     for fold_job_idx, fold_job in enumerate(raw_json):
       try:
@@ -1193,22 +1330,16 @@ def load_fold_inputs_from_path(json_path: pathlib.Path) -> Iterator[Input]:
       except ValueError as e:
         raise ValueError(
             f'Failed to load fold job {fold_job_idx} from {json_path}. The JSON'
-            f' at {json_path} was detected to be an AlphaFold Server JSON since'
-            ' the top-level is a list.'
+            ' was detected to be the AlphaFold Server dialect.'
         ) from e
   else:
-    logging.info(
-        'Detected %s is an AlphaFold 3 JSON since the top-level is not a list.',
-        json_path,
-    )
     # AlphaFold 3 JSON.
     try:
       yield Input.from_json(json_str, json_path)
     except ValueError as e:
       raise ValueError(
-          f'Failed to load fold input from {json_path}. The JSON at'
-          f' {json_path} was detected to be an AlphaFold 3 JSON since the'
-          ' top-level is not a list.'
+          f'Failed to load fold input from {json_path}. The JSON was detected'
+          ' to be the AlphaFold 3 dialect.'
       ) from e
 
 

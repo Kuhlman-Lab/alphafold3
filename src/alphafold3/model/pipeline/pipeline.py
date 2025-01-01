@@ -133,6 +133,7 @@ class WholePdbPipeline:
     flatten_non_standard_residues: bool = True
     remove_nonsymmetric_bonds: bool = False
     deterministic_frames: bool = True
+    conformer_max_iterations: int | None = None
 
   def __init__(
       self,
@@ -348,6 +349,7 @@ class WholePdbPipeline:
     )
 
     ref_max_modified_date = self._config.max_template_date
+    conformer_max_iterations = self._config.conformer_max_iterations
     batch_ref_structure, ligand_ligand_bonds = (
         features.RefStructure.compute_features(
             all_token_atoms_layout=all_token_atoms_layout,
@@ -356,6 +358,7 @@ class WholePdbPipeline:
             chemical_components_data=chemical_components_data,
             random_state=random_state,
             ref_max_modified_date=ref_max_modified_date,
+            conformer_max_iterations=conformer_max_iterations,
             ligand_ligand_bonds=ligand_ligand_bonds,
         )
     )
@@ -370,6 +373,7 @@ class WholePdbPipeline:
               np.random.RandomState(_DETERMINISTIC_FRAMES_RANDOM_SEED)
           ),
           ref_max_modified_date=ref_max_modified_date,
+          conformer_max_iterations=None,
           ligand_ligand_bonds=ligand_ligand_bonds,
       )
 

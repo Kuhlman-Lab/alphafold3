@@ -225,5 +225,6 @@
       "num_bins": 64
     }
   },
-  "num_recycles": 10
+  "num_recycles": 10,
+  "return_embeddings": false
 }

@@ -334,6 +334,9 @@ def weighted_nanmean(
   with warnings.catch_warnings():
     # Mean of empty slice is ok and should return a NaN.
     warnings.filterwarnings(action='ignore', message='Mean of empty slice')
+    warnings.filterwarnings(
+        action='ignore', message='invalid value encountered in (scalar )?divide'
+    )
     return np.nanmean(value * mask_with_nan, axis=axis) / np.nanmean(
         mask_with_nan, axis=axis
     )

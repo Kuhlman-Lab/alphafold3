@@ -31,7 +31,6 @@ from alphafold3.common import resources
 from alphafold3.common.testing import data as testing_data
 from alphafold3.data import pipeline
 from alphafold3.model.atom_layout import atom_layout
-from alphafold3.model.diffusion import model as diffusion_model
 from alphafold3.model.scoring import alignment
 from alphafold3.structure import test_utils
 import jax
@@ -181,8 +180,7 @@ class InferenceTest(test_utils.StructureTestCase):
     }
     self._test_input_json = json.dumps(test_input)
     self._runner = run_alphafold.ModelRunner(
-        model_class=run_alphafold.diffusion_model.Diffuser,
-        config=run_alphafold.make_model_config(),
+        config=run_alphafold.make_model_config(return_embeddings=True),
         device=jax.local_devices()[0],
         model_dir=pathlib.Path(run_alphafold.MODEL_DIR.value),
     )
@@ -214,6 +212,8 @@ class InferenceTest(test_utils.StructureTestCase):
     )
     inference_result = jax.tree_util.tree_map(_hash_data, inference_result)
     self.assertIsNotNone(inference_result)
+    embeddings = self._runner.extract_embeddings(result=inference_result)
+    self.assertLen(embeddings, 2)
 
   def test_process_fold_input_runs_only_inference(self):
     with self.assertRaisesRegex(ValueError, 'missing unpaired MSA.'):
@@ -249,8 +249,7 @@ class InferenceTest(test_utils.StructureTestCase):
         fold_input,
         self._data_pipeline_config,
         run_alphafold.ModelRunner(
-            model_class=diffusion_model.Diffuser,
-            config=run_alphafold.make_model_config(),
+            config=run_alphafold.make_model_config(return_embeddings=True),
             device=jax.local_devices(backend='gpu')[0],
             model_dir=pathlib.Path(run_alphafold.MODEL_DIR.value),
         ),
@@ -270,12 +269,13 @@ class InferenceTest(test_utils.StructureTestCase):
     self.assertSameElements(
         os.listdir(output_dir),
         [
-            # Subdirectories, one for each sample.
+            # Subdirectories, one for each sample and one for embeddings.
             'seed-1234_sample-0',
             'seed-1234_sample-1',
             'seed-1234_sample-2',
             'seed-1234_sample-3',
             'seed-1234_sample-4',
+            'seed-1234_embeddings',
             # Top ranking result.
             expected_confidences_filename,
             expected_model_cif_filename,
@@ -287,6 +287,10 @@ class InferenceTest(test_utils.StructureTestCase):
             # The output terms of use.
             'TERMS_OF_USE.md',
         ],
+    )
+    self.assertSameElements(
+        os.listdir(os.path.join(output_dir, 'seed-1234_embeddings')),
+        ['embeddings.npz'],
     )
 
     with open(os.path.join(output_dir, expected_data_json_filename), 'rt') as f:
