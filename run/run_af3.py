@@ -658,10 +658,6 @@ if __name__ == '__main__':
 
     args_dict = get_af3_args()
 
-    # Work around for a known XLA issue:
-    # https://github.com/google-deepmind/alphafold3/blob/main/docs/performance.md#compilation-time-workaround-with-xla-flags
-    os.environ["XLA_FLAGS"] = "--xla_gpu_enable_triton_gemm=false"
-
     # Add required flag for CUDA compute capability 7.x
     if args_dict["cuda_compute_7x"]:
         os.environ["XLA_FLAGS"] = "--xla_disable_hlo_passes=custom-kernel-fusion-rewriter"
