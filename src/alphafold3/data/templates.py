@@ -135,7 +135,7 @@ def _encode_restype(
 
 _DAYS_BEFORE_QUERY_DATE: Final[int] = 60
 _HIT_DESCRIPTION_REGEX = re.compile(
-    r'(?P<pdb_id>[a-z0-9]{4,})_(?P<chain_id>\w+)/(?P<start>\d+)-(?P<end>\d+) '
+    r'(?P<pdb_id>\w+)_(?P<chain_id>\w+)/(?P<start>\d+)-(?P<end>\d+) '
     r'.* length:(?P<length>\d+)\b.*'
 )
 
