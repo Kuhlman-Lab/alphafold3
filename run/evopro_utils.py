@@ -8,7 +8,6 @@ import textwrap
 import jax
 
 from alphafold3.jax.attention import attention
-from alphafold3.model.diffusion import model as diffusion_model
 from alphafold3.model.post_processing import post_process_inference_result
 
 from af3_utils import load_fold_inputs_from_path, get_af3_args
@@ -29,13 +28,22 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
 
     # Fail early on incompatible devices, only in init.
     gpu_devices = jax.local_devices(backend='gpu')
-    if gpu_devices and float(gpu_devices[0].compute_capability) < 8.0:
-        raise ValueError(
-            'There are currently known unresolved numerical issues with using'
-            ' devices with compute capability less than 8.0. See '
-            ' https://github.com/google-deepmind/alphafold3/issues/59 for'
-            ' tracking.'
-        )
+    if gpu_devices:
+        compute_capability = float(gpu_devices[0].compute_capability)
+        if compute_capability < 6.0:
+            raise ValueError(
+                'AlphaFold 3 requires at least GPU compute capability 6.0 (see'
+                ' https://developer.nvidia.com/cuda-gpus).'
+            )
+        elif 7.0 <= compute_capability < 8.0:
+            xla_flags = os.environ.get('XLA_FLAGS')
+            required_flag = '--xla_disable_hlo_passes=custom-kernel-fusion-rewriter'
+            if not xla_flags or required_flag not in xla_flags:
+                raise ValueError(
+                    'For devices with GPU compute capability 7.x (see'
+                    ' https://developer.nvidia.com/cuda-gpus), you must include'
+                    ' the --cuda_compute_7x flag.'
+                )
 
     # Keep notice in init function, only print for proc_id 0.
     if proc_id == 0:
@@ -54,7 +62,6 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
 
     devices = jax.local_devices(backend='gpu')
     model_runner = ModelRunner(
-        model_class=diffusion_model.Diffuser,
         config=make_model_config(
             flash_attention_implementation=typing.cast(
                 attention.Implementation, args_dict["flash_attention_implementation"]
@@ -86,7 +93,7 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
         "modelSeeds": ['42']
     }
     json_str = json.dumps(json_dict)
-    fold_input = load_fold_inputs_from_path(json_str)[0]
+    fold_input = [i for i in load_fold_inputs_from_path(json_str)][0]
 
     # Make folding prediction
     _ = model_runner.model_params
@@ -108,7 +115,7 @@ def run_af3(json_str: str, proc_id: int, arg_file: str, buckets: Tuple[int], com
         )
 
     # Convert json_str to fold_input and make prediction
-    fold_input = load_fold_inputs_from_path(json_str)[0]
+    fold_input = [i for i in load_fold_inputs_from_path(json_str)][0]
     all_inference_results = predict_structure(
         fold_input=fold_input,
         model_runner=compiled_runner, 
