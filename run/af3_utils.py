@@ -8,6 +8,7 @@ import json
 import pathlib
 import logging
 import requests
+import itertools
 from alphafold3.common.folding_input import Input, Template
 from alphafold3.data import templates, structure_stores, msa_config
 from alphafold3.structure import from_mmcif
@@ -242,6 +243,37 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
         # These defaults may need changed with future AF3 updates.
         set_if_absent(raw_json, 'dialect', 'alphafold3')
         set_if_absent(raw_json, 'version', 2)
+
+        # Resolve the ids in case if copies are provided.
+        ids_present = set()
+        copies = 0
+        for sequence in raw_json['sequences']:
+            check = [('id' not in sequence[k] or 'copies' not in sequence[k]) for k in sequence]
+            if check == [False]:
+                raise ValueError("Both 'copies' and 'id' cannot be present in the JSON.")
+            ids = [sequence[k].get('id', []) for k in sequence]
+            ids_present = ids_present.union(set([e for i in ids for e in i]))
+            copies += sum([sequence[k].get('copies', 0) for k in sequence])
+        total_chains = len(ids_present) + copies
+        if len(ids_present) != total_chains:
+            # Generate chain id combinations
+            alphabet = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+            max_combi = 1 + total_chains // len(alphabet)
+            combinations = []
+            for length in range(1, max_combi + 1):
+                current_combinations = [''.join(combo) for combo in itertools.product(alphabet, repeat=length)]
+                combinations.extend(current_combinations)
+            
+            # Grab ids to assign based on those already present.
+            possible_ids = [i for i in combinations if i not in ids_present]
+            remaining_ids = possible_ids[:total_chains - len(ids_present)]
+
+            # Assign the missing ids
+            for sequence in raw_json['sequences']:
+                for k in sequence:
+                    if "copies" in sequence[k]:
+                        sequence[k]["id"] = [remaining_ids.pop(0) for _ in range(sequence[k]["copies"])]
+                        sequence[k].pop("copies")
         
         # Set default values for empty MSAs and templates
         for sequence in raw_json['sequences']:
