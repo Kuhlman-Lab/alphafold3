@@ -686,16 +686,27 @@ def get_custom_template_hits(
     # Make a fake template database
     db_file = os.path.join(template_path, 'template_db.a3m')
     cif_files = pathlib.Path(template_path).glob("*.cif")
+    store_mapping = {}
     with open(db_file, 'w') as a3m:
         for cif_file in cif_files:
             pdb_name = os.path.basename(cif_file)[:-4]
             with open(cif_file) as f:
                 cif_string = f.read()
             struc = from_mmcif(cif_string, name=pdb_name)
+            if struc.release_date is None:
+                # If no release date, assume it's safe to use.
+                # I know its bad practice, but I'm setting the private variable
+                struc._release_date = datetime.date.fromisoformat(max_template_date)
             chain_map = struc.polymer_author_chain_single_letter_sequence(rna=False, dna=False)
             for ch in chain_map:
                 a3m_str = f">{pdb_name}_{ch} length:{len(chain_map[ch])}\n{chain_map[ch]}\n"
                 a3m.write(a3m_str)
+            cif_str = struc.to_mmcif()
+            store_mapping[pdb_name] = cif_str
+
+    # If the MSA is empty, make sure it at least has the query sequence.
+    if unpaired_msa == "":
+        unpaired_msa = f">query\n{query_seq}"
                 
     # Reformat the unpaired_msa so that the descriptions have no spaces in them
     unpaired_msa_lines = unpaired_msa.splitlines()
@@ -721,7 +732,7 @@ def get_custom_template_hits(
             incdom_e=100    
         ),
         max_a3m_query_sequences=None,
-        structure_store=structure_stores.StructureStore(template_path)
+        structure_store=structure_stores.StructureStore(store_mapping)
     )
     
     # Filter templates.
