@@ -1019,6 +1019,7 @@ def _generate_required_tables_if_missing(
       if '_atom_site.auth_asym_id' in cif:
         # If label_asym_ids is a list of '.', then resort to auth_asym_ids
         label_asym_ids = cif.get_array('_atom_site.auth_asym_id', dtype=object)
+        update['_atom_site.label_asym_id'] = atom_site_entities
 
     atom_site_entities = [
         str(mmcif.str_id_to_int_id(cid)) for cid in label_asym_ids
@@ -1034,6 +1035,7 @@ def _generate_required_tables_if_missing(
       if '_atom_site.auth_asym_id' in cif:
         # If asym_ids is a list of '.', then resort to auth_asym_ids
         asym_ids = _get_string_array_default(cif, '_atom_site.auth_asym_id', [])
+        update['_atom_site.label_asym_id'] = label_asym_ids
 
     if len(atom_site_entities) == 0 or len(asym_ids) == 0:  # pylint: disable=g-explicit-length-test
       raise ValueError(
@@ -1343,10 +1345,6 @@ def get_tables(
   # These columns are the same for all models, fetch them just for the 1st one.
   label_comp_ids = _first_model_string_array('_atom_site.label_comp_id')
   label_asym_ids = _first_model_string_array('_atom_site.label_asym_id')
-  if np.array_equal(label_asym_ids, ['.'] * len(label_asym_ids)):
-    if '_atom_site.auth_asym_id' in cif:
-      # If label_asym_ids is a list of '.', then resort to auth_asym_ids
-      label_asym_ids = _first_model_string_array('_atom_site.auth_asym_id')
   label_seq_ids = _first_model_string_array('_atom_site.label_seq_id')
   label_atom_ids = _first_model_string_array('_atom_site.label_atom_id')
   if '_atom_site.auth_seq_id' in cif:
