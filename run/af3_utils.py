@@ -245,36 +245,8 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
         set_if_absent(raw_json, 'version', 2)
 
         # Resolve the ids in case if copies are provided.
-        ids_present = set()
-        copies = 0
-        for sequence in raw_json['sequences']:
-            check = [('id' not in sequence[k] or 'copies' not in sequence[k]) for k in sequence]
-            if check == [False]:
-                raise ValueError("Both 'copies' and 'id' cannot be present in the JSON.")
-            ids = [sequence[k].get('id', []) for k in sequence]
-            ids_present = ids_present.union(set([e for i in ids for e in i]))
-            copies += sum([sequence[k].get('copies', 0) for k in sequence])
-        total_chains = len(ids_present) + copies
-        if len(ids_present) != total_chains:
-            # Generate chain id combinations
-            alphabet = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-            max_combi = 1 + total_chains // len(alphabet)
-            combinations = []
-            for length in range(1, max_combi + 1):
-                current_combinations = [''.join(combo) for combo in itertools.product(alphabet, repeat=length)]
-                combinations.extend(current_combinations)
-            
-            # Grab ids to assign based on those already present.
-            possible_ids = [i for i in combinations if i not in ids_present]
-            remaining_ids = possible_ids[:total_chains - len(ids_present)]
+        raw_json = _resolve_id_and_copies(raw_json)
 
-            # Assign the missing ids
-            for sequence in raw_json['sequences']:
-                for k in sequence:
-                    if "copies" in sequence[k]:
-                        sequence[k]["id"] = [remaining_ids.pop(0) for _ in range(sequence[k]["copies"])]
-                        sequence[k].pop("copies")
-        
         # Set default values for empty MSAs and templates
         for sequence in raw_json['sequences']:
             if "protein" in sequence:
@@ -324,6 +296,41 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
     
     return raw_json
 
+
+def _resolve_id_and_copies(raw_json: Dict[str, Any]) -> Dict[str, Any]:
+    # Resolve the ids in case if copies are provided.
+    ids_present = set()
+    copies = 0
+    for sequence in raw_json['sequences']:
+        check = [('id' not in sequence[k] or 'copies' not in sequence[k]) for k in sequence]
+        if check == [False]:
+            raise ValueError("Both 'copies' and 'id' cannot be present in the JSON.")
+        ids = [sequence[k].get('id', []) for k in sequence]
+        ids_present = ids_present.union(set([e for i in ids for e in i]))
+        copies += sum([sequence[k].get('copies', 0) for k in sequence])
+    total_chains = len(ids_present) + copies
+    if len(ids_present) != total_chains:
+        # Generate chain id combinations
+        alphabet = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+        max_combi = 1 + total_chains // len(alphabet)
+        combinations = []
+        for length in range(1, max_combi + 1):
+            current_combinations = [''.join(combo) for combo in itertools.product(alphabet, repeat=length)]
+            combinations.extend(current_combinations)
+        
+        # Grab ids to assign based on those already present.
+        possible_ids = [i for i in combinations if i not in ids_present]
+        remaining_ids = possible_ids[:total_chains - len(ids_present)]
+
+        # Assign the missing ids
+        for sequence in raw_json['sequences']:
+            for k in sequence:
+                if "copies" in sequence[k]:
+                    sequence[k]["id"] = [remaining_ids.pop(0) for _ in range(sequence[k]["copies"])]
+                    sequence[k].pop("copies")
+
+    return raw_json
+        
 
 def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Iterator[Input]:
     """Loads multiple fold inputs from a JSON path (or string of a JSON).
@@ -679,16 +686,27 @@ def get_custom_template_hits(
     # Make a fake template database
     db_file = os.path.join(template_path, 'template_db.a3m')
     cif_files = pathlib.Path(template_path).glob("*.cif")
+    store_mapping = {}
     with open(db_file, 'w') as a3m:
         for cif_file in cif_files:
             pdb_name = os.path.basename(cif_file)[:-4]
             with open(cif_file) as f:
                 cif_string = f.read()
             struc = from_mmcif(cif_string, name=pdb_name)
+            if struc.release_date is None:
+                # If no release date, assume it's safe to use.
+                # I know its bad practice, but I'm setting the private variable
+                struc._release_date = datetime.date.fromisoformat(max_template_date)
             chain_map = struc.polymer_author_chain_single_letter_sequence(rna=False, dna=False)
             for ch in chain_map:
                 a3m_str = f">{pdb_name}_{ch} length:{len(chain_map[ch])}\n{chain_map[ch]}\n"
                 a3m.write(a3m_str)
+            cif_str = struc.to_mmcif()
+            store_mapping[pdb_name] = cif_str
+
+    # If the MSA is empty, make sure it at least has the query sequence.
+    if unpaired_msa == "":
+        unpaired_msa = f">query\n{query_seq}"
                 
     # Reformat the unpaired_msa so that the descriptions have no spaces in them
     unpaired_msa_lines = unpaired_msa.splitlines()
@@ -714,7 +732,7 @@ def get_custom_template_hits(
             incdom_e=100    
         ),
         max_a3m_query_sequences=None,
-        structure_store=structure_stores.StructureStore(template_path)
+        structure_store=structure_stores.StructureStore(store_mapping)
     )
     
     # Filter templates.
