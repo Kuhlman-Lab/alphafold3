@@ -1035,7 +1035,7 @@ def _generate_required_tables_if_missing(
       if '_atom_site.auth_asym_id' in cif:
         # If asym_ids is a list of '.', then resort to auth_asym_ids
         asym_ids = _get_string_array_default(cif, '_atom_site.auth_asym_id', [])
-        update['_atom_site.label_asym_id'] = label_asym_ids
+        update['_atom_site.label_asym_id'] = asym_ids
 
     if len(atom_site_entities) == 0 or len(asym_ids) == 0:  # pylint: disable=g-explicit-length-test
       raise ValueError(
