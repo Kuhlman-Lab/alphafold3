@@ -997,6 +997,12 @@ def _generate_required_tables_if_missing(
   atom_site_entities = _get_string_array_default(
       cif, '_atom_site.label_entity_id', []
   )
+  if np.array_equal(atom_site_entities, ['.'] * len(atom_site_entities)):
+    if '_atom_site.pdbx_PDB_model_num' in cif:
+      # If atom_site_entities is a list of '.', then resort to pdbx_PDB_model_num
+      atom_site_entities = _get_string_array_default(
+          cif, '_atom_site.pdbx_PDB_model_num', []
+      )
 
   # OpenMM produces files that don't have any of the tables and also have
   # _atom_site.label_entity_id set to '?' for all atoms. We infer the entities
@@ -1009,6 +1015,11 @@ def _generate_required_tables_if_missing(
       and set(atom_site_entities) == {'?'}  # Expensive check.
   ):
     label_asym_ids = cif.get_array('_atom_site.label_asym_id', dtype=object)
+    if np.array_equal(label_asym_ids, ['.'] * len(label_asym_ids)):
+      if '_atom_site.auth_asym_id' in cif:
+        # If label_asym_ids is a list of '.', then resort to auth_asym_ids
+        label_asym_ids = cif.get_array('_atom_site.auth_asym_id', dtype=object)
+
     atom_site_entities = [
         str(mmcif.str_id_to_int_id(cid)) for cid in label_asym_ids
     ]
