@@ -279,15 +279,17 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                     msa_dict = get_custom_msa_dict(sequence['protein']['unpairedMsa'])
                     sequence['protein']['unpairedMsa'] = msa_dict.get(sequence['protein']['sequence'], "")
                 
-                if sequence['protein']['templates'] != [] and os.path.exists(sequence['protein']['templates']):
-                    # If templates isn't empty and is a path that exists, parse it as custom templates
-                    template_hits = get_custom_template_hits(
-                        sequence['protein']['sequence'], 
-                        sequence['protein']['unpairedMsa'], 
-                        sequence['protein']['templates'],
-                        max_template_date=max_template_date
-                    )
-                    sequence['protein']['templates'] = template_hits
+                if sequence['protein']['templates'] != [] and type(sequence['protein']['templates']) == str:
+                    if os.path.exists(sequence['protein']['templates']):
+                        # If templates isn't empty and is a path that exists, parse it as custom templates
+                        template_hits = get_custom_template_hits(
+                            sequence['protein']['sequence'], 
+                            sequence['protein']['unpairedMsa'], 
+                            sequence['protein']['templates'],
+                            max_template_date=max_template_date
+                        )
+                        sequence['protein']['templates'] = template_hits
+
                     
                 # Make sure pairedMsa is set no matter what
                 set_if_absent(sequence['protein'], 'pairedMsa', '')
