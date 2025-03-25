@@ -51,13 +51,12 @@ _CLASH_PENALIZATION_WEIGHT = 100.0
 
 
 def windowed_solvent_accessible_area(cif: str, window: int = 25) -> np.ndarray:
-  """Implementation of AlphaFold_RSA.
+  """Implementation of AlphaFold-RSA.
 
-  AlphaFold_RSA defined in
-  https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9601767/.
+  AlphaFold-RSA defined in https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9601767.
 
   Args:
-    cif: raw cif string.
+    cif: Raw cif string.
     window: The window over which to average accessible surface area
 
   Returns:
@@ -96,8 +95,8 @@ def fraction_disordered(
   Args:
     struc: A structure to compute rASA metrics on.
     rasa_disorder_cutoff: The threshold at which residues are considered
-      disordered.  Default value taken from
-      https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9601767/.
+      disordered. Default value taken from
+      https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9601767.
 
   Returns:
     The fraction of protein residues that are disordered
@@ -113,14 +112,16 @@ def fraction_disordered(
       rasa.extend(seq_rasa[chain_seq])
       continue
     chain_struc = struc.filter(chain_id=chain_id)
+    # Rename the chain to 'A' as MKDSSP supports only single letter chain IDs.
+    chain_struc = chain_struc.rename_chain_ids(new_id_by_old_id={chain_id: 'A'})
     try:
       rasa_per_residue = windowed_solvent_accessible_area(
           chain_struc.to_mmcif()
       )
       seq_rasa[chain_seq] = rasa_per_residue
       rasa.extend(rasa_per_residue)
-    except (ValueError, RuntimeError):
-      logging.warning('%s: rasa calculation failed', struc.name)
+    except (ValueError, RuntimeError) as e:
+      logging.warning('%s: rasa calculation failed: %s', struc.name, e)
 
   if not rasa:
     return 0.0

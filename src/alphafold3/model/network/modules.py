@@ -19,7 +19,7 @@ from alphafold3.jax.gated_linear_unit import gated_linear_unit
 from alphafold3.model import model_config
 from alphafold3.model.components import haiku_modules as hm
 from alphafold3.model.components import mapping
-from alphafold3.model.diffusion import diffusion_transformer
+from alphafold3.model.network import diffusion_transformer
 import haiku as hk
 import jax
 import jax.numpy as jnp

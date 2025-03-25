@@ -197,7 +197,7 @@ def create_relative_encoding(
   # Embed relative positions using a one-hot embedding of distance along chain
   offset = left_residue_index - right_residue_index
   clipped_offset = jnp.clip(
-      offset + max_relative_idx, a_min=0, a_max=2 * max_relative_idx
+      offset + max_relative_idx, min=0, max=2 * max_relative_idx
   )
   asym_id_same = left_asym_id == right_asym_id
   final_offset = jnp.where(
@@ -211,7 +211,7 @@ def create_relative_encoding(
   # Embed relative token index as a one-hot embedding of distance along residue
   token_offset = left_token_index - right_token_index
   clipped_token_offset = jnp.clip(
-      token_offset + max_relative_idx, a_min=0, a_max=2 * max_relative_idx
+      token_offset + max_relative_idx, min=0, max=2 * max_relative_idx
   )
   residue_same = (left_asym_id == right_asym_id) & (
       left_residue_index == right_residue_index
@@ -234,7 +234,7 @@ def create_relative_encoding(
   max_rel_chain = max_relative_chain
 
   clipped_rel_chain = jnp.clip(
-      rel_sym_id + max_rel_chain, a_min=0, a_max=2 * max_rel_chain
+      rel_sym_id + max_rel_chain, min=0, max=2 * max_rel_chain
   )
 
   final_rel_chain = jnp.where(

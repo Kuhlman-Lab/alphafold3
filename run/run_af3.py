@@ -24,10 +24,10 @@ from alphafold3.data import featurisation
 from alphafold3.data import pipeline
 from alphafold3.jax.attention import attention
 from alphafold3.model import features
+from alphafold3.model import model
 from alphafold3.model import params
 from alphafold3.model import post_processing
 from alphafold3.model.components import utils
-from alphafold3.model.diffusion import model
 import haiku as hk
 import jax
 from jax import numpy as jnp
@@ -144,14 +144,16 @@ def make_model_config(
     *,
     flash_attention_implementation: attention.Implementation = 'triton',
     num_diffusion_samples: int = 5,
+    num_recycles: int = 10,
     return_embeddings: bool = False,
-) -> model.Diffuser.Config:
+) -> model.Model.Config:
     """Returns a model config with some defaults overridden."""
-    config = model.Diffuser.Config()
+    config = model.Model.Config()
     config.global_config.flash_attention_implementation = (
         flash_attention_implementation
     )
     config.heads.diffusion.eval.num_samples = num_diffusion_samples
+    config.num_recycles = num_recycles
     config.return_embeddings = return_embeddings
     return config
 
@@ -161,7 +163,7 @@ class ModelRunner:
 
     def __init__(
         self,
-        config: model.Diffuser.Config,
+        config: model.Model.Config,
         device: jax.Device,
         model_dir: pathlib.Path,
     ):
@@ -182,7 +184,7 @@ class ModelRunner:
 
         @hk.transform
         def forward_fn(batch):
-            return model.Diffuser(self._model_config)(batch)
+            return model.Model(self._model_config)(batch)
 
         return functools.partial(
             jax.jit(forward_fn.apply, device=self._device), self.model_params
@@ -210,30 +212,27 @@ class ModelRunner:
         result['__identifier__'] = identifier
         return result
 
-    def extract_structures(
+    def extract_inference_results_and_maybe_embeddings(
         self,
         batch: features.BatchDict,
         result: model.ModelResult,
         target_name: str,
-    ) -> list[model.InferenceResult]:
-        """Generates structures from model outputs."""
-        return list(
-            model.Diffuser.get_inference_result(
+    ) -> tuple[list[model.InferenceResult], dict[str, np.ndarray] | None]:
+        """Extracts inference results and embeddings (if set) from model outputs."""
+        inference_results = list(
+            model.Model.get_inference_result(
                 batch=batch, result=result, target_name=target_name
             )
         )
-
-    def extract_embeddings(
-        self,
-        result: model.ModelResult,
-    ) -> dict[str, np.ndarray] | None:
-        """Extracts embeddings from model outputs."""
+        num_tokens = len(inference_results[0].metadata['token_chain_ids'])
         embeddings = {}
         if 'single_embeddings' in result:
-            embeddings['single_embeddings'] = result['single_embeddings']
+            embeddings['single_embeddings'] = result['single_embeddings'][:num_tokens]
         if 'pair_embeddings' in result:
-            embeddings['pair_embeddings'] = result['pair_embeddings']
-        return embeddings or None
+            embeddings['pair_embeddings'] = result['pair_embeddings'][
+                :num_tokens, :num_tokens
+            ]
+        return inference_results, embeddings or None
 
 
 @dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
@@ -258,11 +257,12 @@ def predict_structure(
     fold_input: folding_input.Input,
     model_runner: ModelRunner,
     buckets: Sequence[int] | None = None,
+    ref_max_modified_date: datetime.date | None = None,
     conformer_max_iterations: int | None = None,
 ) -> Sequence[ResultsForSeed]:
     """Runs the full inference pipeline to predict structures for each seed."""
 
-    print(f'Featurising data for seeds {fold_input.rng_seeds}...')
+    print(f'Featurising data with {len(fold_input.rng_seeds)} seed(s)...')
     featurisation_start_time = time.time()
     ccd = chemical_components.cached_ccd(user_ccd=fold_input.user_ccd)
     featurised_examples = featurisation.featurise_input(
@@ -270,34 +270,39 @@ def predict_structure(
         buckets=buckets,
         ccd=ccd,
         verbose=True,
+        ref_max_modified_date=ref_max_modified_date,
         conformer_max_iterations=conformer_max_iterations,
     )
     print(
-        f'Featurising data for seeds {fold_input.rng_seeds} took'
+        f'Featurising data with {len(fold_input.rng_seeds)} seed(s) took'
         f' {time.time() - featurisation_start_time:.2f} seconds.'
+    )
+    print(
+        'Running model inference and extracting output structure samples with'
+        f' {len(fold_input.rng_seeds)} seed(s)...'
     )
     all_inference_start_time = time.time()
     all_inference_results = []
     for seed, example in zip(fold_input.rng_seeds, featurised_examples):
-        print(f'Running model inference for seed {seed}...')
+        print(f'Running model inference with seed {seed}...')
         inference_start_time = time.time()
         rng_key = jax.random.PRNGKey(seed)
         result = model_runner.run_inference(example, rng_key)
         print(
-            f'Running model inference for seed {seed} took'
+            f'Running model inference with seed {seed} took'
             f' {time.time() - inference_start_time:.2f} seconds.'
         )
-        print(f'Extracting output structures (one per sample) for seed {seed}...')
+        print(f'Extracting inference results with seed {seed}...')
         extract_structures = time.time()
-        inference_results = model_runner.extract_structures(
-            batch=example, result=result, target_name=fold_input.name
+        inference_results, embeddings = (
+            model_runner.extract_inference_results_and_maybe_embeddings(
+                batch=example, result=result, target_name=fold_input.name
+            )
         )
         print(
-            f'Extracting output structures (one per sample) for seed {seed} took'
-            f' {time.time() - extract_structures:.2f} seconds.'
+            f'Extracting {len(inference_results)} inference samples with'
+            f'seed {seed} took {time.time() - extract_structures:.2f} seconds.'
         )
-
-        embeddings = model_runner.extract_embeddings(result)
 
         all_inference_results.append(
             ResultsForSeed(
@@ -307,13 +312,9 @@ def predict_structure(
                 embeddings=embeddings,
             )
         )
-        print(
-            'Running model inference and extracting output structures for seed'
-            f' {seed} took {time.time() - inference_start_time:.2f} seconds.'
-        )
     print(
-        'Running model inference and extracting output structures for seeds'
-        f' {fold_input.rng_seeds} took'
+        'Running model inference and extracting output structures with'
+        f' {len(fold_input.rng_seeds)} seed(s) took'
         f' {time.time() - all_inference_start_time:.2f} seconds.'
     )
     return all_inference_results
@@ -325,9 +326,9 @@ def write_fold_input_json(
 ) -> None:
     """Writes the input JSON to the output directory."""
     os.makedirs(output_dir, exist_ok=True)
-    with open(
-        os.path.join(output_dir, f'{fold_input.sanitised_name()}_data.json'), 'wt'
-    ) as f:
+    path = os.path.join(output_dir, f'{fold_input.sanitised_name()}_data.json')
+    print(f'Writing model input JSON to {path}.')
+    with open(path, 'wt') as f:
         f.write(fold_input.to_json())
 
 
@@ -352,7 +353,9 @@ def write_outputs(
             sample_dir = os.path.join(output_dir, f'seed-{seed}_sample-{sample_idx}')
             os.makedirs(sample_dir, exist_ok=True)
             post_processing.write_output(
-                inference_result=result, output_dir=sample_dir
+                inference_result=result, 
+                output_dir=sample_dir,
+                name=f'{job_name}_seed-{seed}_sample-{sample_idx}',
             )
             ranking_score = float(result.metadata['ranking_score'])
             ranking_scores.append((seed, sample_idx, ranking_score))
@@ -364,7 +367,9 @@ def write_outputs(
             embeddings_dir = os.path.join(output_dir, f'seed-{seed}_embeddings')
             os.makedirs(embeddings_dir, exist_ok=True)
             post_processing.write_embeddings(
-                embeddings=embeddings, output_dir=embeddings_dir
+                embeddings=embeddings, 
+                output_dir=embeddings_dir,
+                name=f'{job_name}_seed-{seed}',
             )
 
     if max_ranking_result is not None:  # True iff ranking_scores non-empty.
@@ -377,7 +382,9 @@ def write_outputs(
         )
         # Save csv of ranking scores with seeds and sample indices, to allow easier
         # comparison of ranking scores across different runs.
-        with open(os.path.join(output_dir, 'ranking_scores.csv'), 'wt') as f:
+        with open(
+            os.path.join(output_dir, f'{job_name}_ranking_scores.csv'), 'wt'
+        ) as f:
             writer = csv.writer(f)
             writer.writerow(['seed', 'sample', 'ranking_score'])
             writer.writerows(ranking_scores)
@@ -406,6 +413,9 @@ def process_fold_input(
     model_runner: None,
     output_dir: os.PathLike[str] | str,
     buckets: Sequence[int] | None = None,
+    ref_max_modified_date: datetime.date | None = None,
+    conformer_max_iterations: int | None = None,
+    force_output_dir: bool = False,
 ) -> folding_input.Input:
     ...
 
@@ -417,6 +427,9 @@ def process_fold_input(
     model_runner: ModelRunner,
     output_dir: os.PathLike[str] | str,
     buckets: Sequence[int] | None = None,
+    ref_max_modified_date: datetime.date | None = None,
+    conformer_max_iterations: int | None = None,
+    force_output_dir: bool = False,
 ) -> Sequence[ResultsForSeed]:
     ...
 
@@ -427,7 +440,9 @@ def process_fold_input(
     model_runner: ModelRunner | None,
     output_dir: os.PathLike[str] | str,
     buckets: Sequence[int] | None = None,
+    ref_max_modified_date: datetime.date | None = None,
     conformer_max_iterations: int | None = None,
+    force_output_dir: bool = False,
 ) -> folding_input.Input | Sequence[ResultsForSeed]:
     """Runs data pipeline and/or inference on a single fold input.
 
@@ -442,8 +457,17 @@ def process_fold_input(
             number of tokens. If not None, must be a sequence of at least one integer,
             in strictly increasing order. Will raise an error if the number of tokens
             is more than the largest bucket size.
+        ref_max_modified_date: Optional maximum date that controls whether to allow
+            use of model coordinates for a chemical component from the CCD if RDKit
+            conformer generation fails and the component does not have ideal 
+            coordinates set. Only for components that have been released before this
+            date the model coordinates can be used as a fallback.
         conformer_max_iterations: Optional override for maximum number of iterations
             to run for RDKit conformer search.
+        force_output_dir: If True, do not create a new output directory even if the
+            existing one is non-empty. Instead use the existing output directory and
+            potentially overwrite existing files. If False, create a new timestamped
+            output directory instead if the existing one is non-empty.
 
     Returns:
         The processed fold input, or the inference results for each seed.
@@ -451,26 +475,26 @@ def process_fold_input(
     Raises:
         ValueError: If the fold input has no chains.
     """
-    print(f'Processing fold input {fold_input.name}')
+    print(f'\nRunning fold job {fold_input.name}...')
 
     if not fold_input.chains:
         raise ValueError('Fold input has no chains.')
 
-    if os.path.exists(output_dir) and os.listdir(output_dir):
+    if (
+        not force_output_dir
+        and os.path.exists(output_dir)
+        and os.listdir(output_dir)
+    ):
         new_output_dir = (
             f'{output_dir}_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
         )
         print(
-            f'Output directory {output_dir} exists and non-empty, using instead '
-            f' {new_output_dir}.'
+            f'Output will be written in {new_output_dir} since {output_dir} is'
+            ' non-empty.'
         )
         output_dir = new_output_dir
-
-    if model_runner is not None:
-        # If we're running inference, check we can load the model parameters before
-        # (possibly) launching the data pipeline.
-        print('Checking we can load the model parameters...')
-        _ = model_runner.model_params
+    else:
+        print(f'Output will be written in {output_dir}.')
 
     if data_pipeline_config is None:
         print('Skipping data pipeline...')
@@ -478,27 +502,23 @@ def process_fold_input(
         print('Running data pipeline...')
         fold_input = pipeline.DataPipeline(data_pipeline_config).process(fold_input)
 
-    print(f'Output directory: {output_dir}')
-    print(f'Writing model input JSON to {output_dir}')
     write_fold_input_json(fold_input, output_dir)
     if model_runner is None:
-        print('Skipping inference...')
+        print('Skipping model inference...')
         output = fold_input
     else:
         print(
-            f'Predicting 3D structure for {fold_input.name} for seed(s)'
-            f' {fold_input.rng_seeds}...'
+            f'Predicting 3D structure for {fold_input.name} with'
+            f' {len(fold_input.rng_seeds)} seed(s)...'
         )
         all_inference_results = predict_structure(
             fold_input=fold_input,
             model_runner=model_runner,
             buckets=buckets,
+            ref_max_modified_date=ref_max_modified_date,
             conformer_max_iterations=conformer_max_iterations,
         )
-        print(
-            f'Writing outputs for {fold_input.name} for seed(s)'
-            f' {fold_input.rng_seeds}...'
-        )
+        print(f'Writing outputs with {len(fold_input.rng_seeds)} seed(s)...')
         write_outputs(
             all_inference_results=all_inference_results,
             output_dir=output_dir,
@@ -506,7 +526,7 @@ def process_fold_input(
         )
         output = all_inference_results
 
-    print(f'Done processing fold input {fold_input.name}.')
+    print(f'Fold job {fold_input.name} done, output written to {output_dir}.\n')
     return output
 
 
@@ -519,12 +539,6 @@ def main(args_dict: Dict[str, Any]) -> None:
     if args_dict["json_path"] is None == args_dict["input_dir"] is None:
         raise ValueError(
             'Exactly one of --json_path or --input_dir must be specified.'
-        )
-
-    if not args_dict["run_inference"] and not args_dict["run_data_pipeline"]:
-        raise ValueError(
-            'At least one of --run_inference or --run_data_pipeline must be'
-            ' set to true.'
         )
 
     # Make sure we can create the output directory before running anything.
@@ -557,7 +571,7 @@ def main(args_dict: Dict[str, Any]) -> None:
         # Fail early on incompatible devices, but only if we're running inference.
         gpu_devices = jax.local_devices(backend='gpu')
         if gpu_devices:
-            compute_capability = float(gpu_devices[0].compute_capability)
+            compute_capability = float(gpu_devices[args_dict["gpu_device"]].compute_capability)
             if compute_capability < 6.0:
                 raise ValueError(
                     'AlphaFold 3 requires at least GPU compute capability 6.0 (see'
@@ -572,6 +586,12 @@ def main(args_dict: Dict[str, Any]) -> None:
                         ' https://developer.nvidia.com/cuda-gpus), you must include'
                         ' the --cuda_compute_7x flag.'
                     )
+                if args_dict["flash_attention_implementation"] != "xla":
+                    raise ValueError(
+                        'For devices with GPU compute capability 7.x (see '
+                        ' https://developer.nvidia.com/cuda-gpus) the '
+                        ' --flash_attention_implementation must be set to "xla".'
+                    )
 
     notice = textwrap.wrap(
         'Running AlphaFold 3. Please note that standard AlphaFold 3 model'
@@ -584,8 +604,9 @@ def main(args_dict: Dict[str, Any]) -> None:
         break_on_hyphens=False,
         width=80,
     )
-    print('\n'.join(notice))
+    print('\n' + '\n'.join(notice) + '\n')
 
+    max_template_date = datetime.date.fromisoformat(args_dict["max_template_date"])
     if args_dict["run_data_pipeline"]:
         # We skip this (by setting run_data_pipeline=False) since we handle MSAs
         # and templates differently.
@@ -609,15 +630,17 @@ def main(args_dict: Dict[str, Any]) -> None:
             seqres_database_path=expand_path(_SEQRES_DATABASE_PATH.value),
             jackhmmer_n_cpu=_JACKHMMER_N_CPU.value,
             nhmmer_n_cpu=_NHMMER_N_CPU.value,
+            max_template_date=max_template_date,
         )
     else:
-        print('Skipping running the data pipeline.')
         data_pipeline_config = None
 
     if args_dict["run_inference"]:
         devices = jax.local_devices(backend='gpu')
-        print(f'Found local devices: {devices}')
-
+        print(
+            f'Found local devices: {devices}, using device {args_dict["gpu_device"]}:'
+            f' {devices[args_dict["gpu_device"]]}'
+        )
         print('Building model from scratch...')
         model_runner = ModelRunner(
             config=make_model_config(
@@ -625,30 +648,36 @@ def main(args_dict: Dict[str, Any]) -> None:
                     attention.Implementation, args_dict["flash_attention_implementation"]
                 ),
                 num_diffusion_samples=args_dict["num_diffusion_samples"],
+                num_recycles=args_dict["num_recycles"],
                 return_embeddings=args_dict["save_embeddings"],
             ),
-            device=devices[0],
+            device=devices[args_dict["gpu_device"]],
             model_dir=pathlib.Path(args_dict["model_dir"]),
         )
+        # Check we can load the model parameters before launching anything.
+        print('Checking that model parameters can be loaded...')
+        _ = model_runner.model_params
     else:
-        print('Skipping running model inference.')
         model_runner = None
 
-    print('Processing fold inputs.')
     num_fold_inputs = 0
     for fold_input in fold_inputs:
-        print(f'Processing fold input #{num_fold_inputs + 1}')
+        if args_dict["num_seeds"] is not None:
+            print(f'Expanding fold job {fold_input.name} to {args_dict["num_seeds"]} seeds.')
+            fold_input = fold_input.with_multiple_seeds(args_dict["num_seeds"])
         process_fold_input(
             fold_input=fold_input,
             data_pipeline_config=data_pipeline_config,
             model_runner=model_runner,
             output_dir=os.path.join(args_dict["output_dir"], fold_input.sanitised_name()),
             buckets=tuple(int(bucket) for bucket in args_dict["buckets"]),
+            ref_max_modified_date=max_template_date,
             conformer_max_iterations=args_dict["conformer_max_iterations"],
+            force_output_dir=args_dict["force_output_dir"],
         )
         num_fold_inputs += 1
 
-    print(f'Done processing {num_fold_inputs} fold inputs.')
+    print(f'Done running {num_fold_inputs} fold jobs.')
 
 
 if __name__ == '__main__':

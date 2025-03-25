@@ -17,7 +17,7 @@ from alphafold3.model import features
 from alphafold3.model import model_config
 from alphafold3.model import protein_data_processing
 from alphafold3.model.components import haiku_modules as hm
-from alphafold3.model.diffusion import modules
+from alphafold3.model.network import modules
 from alphafold3.model.scoring import scoring
 import haiku as hk
 import jax

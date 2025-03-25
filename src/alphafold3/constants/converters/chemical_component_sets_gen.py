@@ -32,7 +32,7 @@ def find_ions_and_glycans_in_ccd(
   glycans_linking = []
   glycans_other = []
   ions = []
-  for name, comp in tqdm.tqdm(ccd.items()):
+  for name, comp in tqdm.tqdm(ccd.items(), disable=None):
     if name == 'UNX':
       continue  # Skip "unknown atom or ion".
     comp_type = comp['_chem_comp.type'][0].lower()

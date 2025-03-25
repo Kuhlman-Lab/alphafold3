@@ -95,6 +95,16 @@ AlphaFold 3 can run on inputs of size up to 4,352 tokens on a single NVIDIA A100
       )
     ```
 
+The format of entries in `pair_transition_shard_spec` is
+`(num_tokens_upper_bound, shard_size)`. Setting `shard_size=None` means there is
+no upper bound.
+
+For the example above:
+
+*   `(2048, None)`: for sequences up to 2,048 tokens, do not shard
+*   `(3072, 1024)`: for sequences up to 3,072 tokens, shard in chunks of 1,024
+*   `(None, 512)`: for all other sequences, shard in chunks of 512
+
 While numerically accurate, this configuration will have lower throughput
 compared to the set up on the NVIDIA A100 (80 GB), due to less available memory.
 

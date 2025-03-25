@@ -16,7 +16,7 @@ import json
 from typing import Any, Self
 
 from absl import logging
-from alphafold3.model.diffusion import model
+from alphafold3.model import model
 import jax
 import numpy as np
 

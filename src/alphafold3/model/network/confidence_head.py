@@ -15,8 +15,8 @@ from alphafold3.model import model_config
 from alphafold3.model.atom_layout import atom_layout
 from alphafold3.model.components import haiku_modules as hm
 from alphafold3.model.components import utils
-from alphafold3.model.diffusion import modules
-from alphafold3.model.diffusion import template_modules
+from alphafold3.model.network import modules
+from alphafold3.model.network import template_modules
 import haiku as hk
 import jax
 import jax.numpy as jnp

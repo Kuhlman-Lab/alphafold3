@@ -19,21 +19,21 @@ _LICENSE_URL: Final[str] = (
     'https://github.com/google-deepmind/alphafold3/blob/main/OUTPUT_TERMS_OF_USE.md'
 )
 
-_LICENSE: Final[str] = f"""\
+_LICENSE: Final[str] = f"""
 Non-commercial use only, by using this file you agree to the terms of use found
 at {_LICENSE_URL}.
 To request access to the AlphaFold 3 model parameters, follow the process set
 out at https://github.com/google-deepmind/alphafold3. You may only use these if
 received directly from Google. Use is subject to terms of use available at
 https://github.com/google-deepmind/alphafold3/blob/main/WEIGHTS_TERMS_OF_USE.md.
-"""
+""".strip()
 
 _DISCLAIMER: Final[str] = """\
 AlphaFold 3 and its output are not intended for, have not been validated for,
 and are not approved for clinical use. They are provided "as-is" without any
 warranty of any kind, whether expressed or implied. No warranty is given that
 use shall not infringe the rights of any third party.
-"""
+""".strip()
 
 _MMCIF_PAPER_AUTHORS: Final[tuple[str, ...]] = (
     'Google DeepMind',
@@ -168,14 +168,45 @@ def add_metadata_to_mmcif(
   cif['_ma_qa_metric.mode'] = ['global', 'local']
   cif['_ma_qa_metric.software_group_id'] = ['1', '1']
 
-  # Global model confidence metric value.
+  # Global model confidence pLDDT value.
   cif['_ma_qa_metric_global.ordinal_id'] = ['1']
   cif['_ma_qa_metric_global.model_id'] = ['1']
   cif['_ma_qa_metric_global.metric_id'] = ['1']
+  # Mean over all atoms, since AlphaFold 3 outputs pLDDT per-atom.
   global_plddt = np.mean(
       [float(v) for v in old_cif['_atom_site.B_iso_or_equiv']]
   )
   cif['_ma_qa_metric_global.metric_value'] = [f'{global_plddt:.2f}']
+
+  # Local (per residue) model confidence pLDDT value.
+  cif['_ma_qa_metric_local.ordinal_id'] = []
+  cif['_ma_qa_metric_local.model_id'] = []
+  cif['_ma_qa_metric_local.label_asym_id'] = []
+  cif['_ma_qa_metric_local.label_seq_id'] = []
+  cif['_ma_qa_metric_local.label_comp_id'] = []
+  cif['_ma_qa_metric_local.metric_id'] = []
+  cif['_ma_qa_metric_local.metric_value'] = []
+
+  plddt_grouped_by_res = {}
+  for *res, atom_plddt in zip(
+      old_cif['_atom_site.label_asym_id'],
+      old_cif['_atom_site.label_seq_id'],
+      old_cif['_atom_site.label_comp_id'],
+      old_cif['_atom_site.B_iso_or_equiv'],
+  ):
+    plddt_grouped_by_res.setdefault(tuple(res), []).append(float(atom_plddt))
+
+  for ordinal_id, ((chain_id, res_id, res_name), res_plddts) in enumerate(
+      plddt_grouped_by_res.items(), start=1
+  ):
+    res_plddt = np.mean(res_plddts)
+    cif['_ma_qa_metric_local.ordinal_id'].append(str(ordinal_id))
+    cif['_ma_qa_metric_local.model_id'].append('1')
+    cif['_ma_qa_metric_local.label_asym_id'].append(chain_id)
+    cif['_ma_qa_metric_local.label_seq_id'].append(res_id)
+    cif['_ma_qa_metric_local.label_comp_id'].append(res_name)
+    cif['_ma_qa_metric_local.metric_id'].append('2')  # See _ma_qa_metric.id.
+    cif['_ma_qa_metric_local.metric_value'].append(f'{res_plddt:.2f}')
 
   cif['_atom_type.symbol'] = sorted(set(old_cif['_atom_site.type_symbol']))
 

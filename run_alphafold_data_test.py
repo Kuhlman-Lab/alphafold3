@@ -162,14 +162,14 @@ class DataPipelineTest(test_utils.StructureTestCase):
         'sequences': [
             {
                 'protein': {
-                    'id': 'A',
+                    'id': 'P',
                     'sequence': 'SEFEKLRQTGDELVQAFQRLREIFDKGDDDSLEQVLEEIEELIQKHRQLFDNRQEAADTEAAKQGDQWVQLFQRFREAIDKGDKDSLEQLLEELEQALQKIRELAEKKN',
                     'modifications': [],
                     'unpairedMsa': None,
                     'pairedMsa': None,
                 }
             },
-            {'ligand': {'id': 'B', 'ccdCodes': ['7BU']}},
+            {'ligand': {'id': 'LL', 'ccdCodes': ['7BU']}},
         ],
         'dialect': folding_input.JSON_DIALECT,
         'version': folding_input.JSON_VERSION,
@@ -209,6 +209,7 @@ class DataPipelineTest(test_utils.StructureTestCase):
         ccd=chemical_components.cached_ccd(),
         buckets=None,
     )
+    del featurised_example[0]['ref_pos']  # Depends on specific RDKit version.
 
     with _output('featurised_example.pkl') as (_, output):
       output.write(pickle.dumps(featurised_example))

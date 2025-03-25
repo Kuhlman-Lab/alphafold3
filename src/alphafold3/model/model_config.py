@@ -8,7 +8,7 @@
 # if received directly from Google. Use is subject to terms of use available at
 # https://github.com/google-deepmind/alphafold3/blob/main/WEIGHTS_TERMS_OF_USE.md
 
-"""Config for the protein folding model and experiment."""
+"""Global config for the model."""
 
 from collections.abc import Sequence
 from typing import Literal, TypeAlias

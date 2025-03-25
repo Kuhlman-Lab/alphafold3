@@ -2,7 +2,9 @@
 
 This is an unofficial repo that wraps around [Google Deepmind's AlphaFold3](https://github.com/google-deepmind/alphafold3). It extends some of the official repo's functionality and utilizes [ColabFold](https://github.com/sokrypton/ColabFold) and its MMseqs2 server for protein MSA and template generation.
 
-This repository will be updated frequently so be sure to pull the newest version from GitHub often. **If files in `src/alphafold3` change, you MUST re-run Step 7 from Installation below to reinstall AF3.**
+This repository will be updated frequently (with both official and unofficial changes) so be sure to pull the newest version from GitHub often. **If files in `src/alphafold3` change, you MUST re-run Step 7 from Installation below to reinstall AF3.**
+
+Last commit merged from official AF3 repo: `69b749c`
 
 ## Getting started
 

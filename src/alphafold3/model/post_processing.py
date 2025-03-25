@@ -17,7 +17,7 @@ import os
 from alphafold3 import version
 from alphafold3.model import confidence_types
 from alphafold3.model import mmcif_metadata
-from alphafold3.model.diffusion import model
+from alphafold3.model import model
 import numpy as np
 
 
@@ -116,8 +116,10 @@ def write_output(
 def write_embeddings(
     embeddings: dict[str, np.ndarray],
     output_dir: os.PathLike[str] | str,
+    name: str | None = None,
 ) -> None:
   """Writes embeddings to a directory."""
+  prefix = f'{name}_' if name is not None else ''
 
-  with open(os.path.join(output_dir, 'embeddings.npz'), 'wb') as f:
-    np.savez_compressed(f, allow_pickle=False, **embeddings)
+  with open(os.path.join(output_dir, f'{prefix}embeddings.npz'), 'wb') as f:
+    np.savez_compressed(f, **embeddings)

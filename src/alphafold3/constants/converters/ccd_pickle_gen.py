@@ -36,7 +36,7 @@ def main(argv: Sequence[str]) -> None:
   result = {
       key: {k: tuple(v) for k, v in value.items()}
       for key, value in tqdm.tqdm(
-          cif_dict.parse_multi_data_cif(whole_file).items()
+          cif_dict.parse_multi_data_cif(whole_file).items(), disable=None
       )
   }
   assert len(result) == whole_file.count(b'data_')
