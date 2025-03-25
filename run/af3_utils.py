@@ -88,6 +88,13 @@ def get_af3_parser() -> FileArgumentParser:
         default=None,
         help="Path to a directory where the results will be saved."
     )
+    parser.add_argument(
+        "--force_output_dir",
+        type=int,
+        default=0,
+        help="Whether to force the output directory to be used even if it already"
+        "exists and is non-empty."
+    )
     
     # Output control.
     parser.add_argument(
@@ -119,10 +126,27 @@ def get_af3_parser() -> FileArgumentParser:
         " across GPU devices. Defaults to 'triton'."
     )
     parser.add_argument(
+        "--num_recycles",
+        type=int,
+        default=10,
+        help="Number of recycles to use during inference."
+    )
+    parser.add_argument(
         "--num_diffusion_samples",
         type=int,
         default=5,
         help="Number of diffusion samples to generate per seed. Defaults to 5."
+    )
+    parser.add_argument(
+        "--num_seeds",
+        type=int,
+        default=None,
+        help="Number of seeds to use for inference. If set, only a single"
+        " seed must be provided in the input JSON. AlphaFold 3 will then"
+        " generate random seeds in sequence, starting from the single seed"
+        " specified in the input JSON. The full input JSON produced by"
+        " AlphaFold 3 will include the generated random seeds. If not set,"
+        " AlphaFold 3 will use the seeds as provided in the input JSON."
     )
     
     # Control which stages to run.
@@ -148,7 +172,12 @@ def get_af3_parser() -> FileArgumentParser:
         type=str,
         default='3000-01-01', # Set in far future.
         help="Maximum template release date to consider. Format: YYYY-MM-DD. "
-        "All templates released after this date will be ignored."
+        "All templates released after this date will be ignored. Controls also "
+        "whether to allow use of model coordinates for a chemical component "
+        "from the CCD if RDKit conformer generation fails and the component "
+        "does not have ideal coordinates set. Only for components that have "
+        "been released before this date the model coordinates can be used as "
+        "a fallback."
     )
 
     # Conformer generation.
@@ -160,7 +189,7 @@ def get_af3_parser() -> FileArgumentParser:
         "conformer search."
     )
 
-    # Compilation arguments.
+    # Compilation and GPU arguments.
     parser.add_argument(
         "--jax_compilation_cache_dir",
         type=str,
@@ -185,6 +214,14 @@ def get_af3_parser() -> FileArgumentParser:
         " set this flag to 1. This will set "
         " XLA_FLAGS='--xla_disable_hlo_passes=custom-kernel-fusion-rewriter'."
         " Defaults to 0 (False)."
+    )
+    parser.add_argument(
+        "--gpu_device",
+        type=int,
+        default=0,
+        help="Optional override for the GPU device to use for inference."
+        " Defaults to the 1st GPU on the system. Useful on multi-GPU systems"
+        " to pin each run to a specific GPU."
     )
 
     return parser
@@ -211,10 +248,18 @@ def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
     
     # Reformat some of the arguments
     args.run_inference = binary_to_bool(args.run_inference)
+    args.force_output_dir = binary_to_bool(args.force_output_dir)
     args.cuda_compute_7x = binary_to_bool(args.cuda_compute_7x)
     args.save_embeddings = binary_to_bool(args.save_embeddings)
     args.buckets = sorted([int(b) for b in args.buckets.split(',')])
     args.run_data_pipeline = False # Kuhlman Lab installation handles MSAs and templates differently
+    
+    # Check for ValueErrors in certain arguments
+    if args.num_recycles < 1:
+        raise ValueError("--num_recycles must be greater than or equal to 1.")
+    if args.num_seeds is not None:
+        if args.num_seeds < 1:
+            raise ValueError("--num_seeds must be greater than or equal to 1.")
     
     return vars(args)
 
@@ -242,7 +287,7 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
     else:
         # These defaults may need changed with future AF3 updates.
         set_if_absent(raw_json, 'dialect', 'alphafold3')
-        set_if_absent(raw_json, 'version', 2)
+        set_if_absent(raw_json, 'version', 3)
 
         # Resolve the ids in case if copies are provided.
         raw_json = _resolve_id_and_copies(raw_json)
