@@ -521,12 +521,6 @@ def main(args_dict: Dict[str, Any]) -> None:
             'Exactly one of --json_path or --input_dir must be specified.'
         )
 
-    if not args_dict["run_inference"] and not args_dict["run_data_pipeline"]:
-        raise ValueError(
-            'At least one of --run_inference or --run_data_pipeline must be'
-            ' set to true.'
-        )
-
     # Make sure we can create the output directory before running anything.
     try:
         os.makedirs(args_dict["output_dir"], exist_ok=True)
