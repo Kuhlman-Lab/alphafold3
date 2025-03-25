@@ -641,7 +641,6 @@ def main(args_dict: Dict[str, Any]) -> None:
             f'Found local devices: {devices}, using device {args_dict["gpu_device"]}:'
             f' {devices[args_dict["gpu_device"]]}'
         )
-
         print('Building model from scratch...')
         model_runner = ModelRunner(
             config=make_model_config(

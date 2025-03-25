@@ -131,6 +131,16 @@ There are known numerical issues with CUDA Capability 7.x devices. To work
 around the issue, set the environment variable `XLA_FLAGS` to include
 `--xla_disable_hlo_passes=custom-kernel-fusion-rewriter`.
 
+#### Other devices
+
+There are known issues with CUDA Capability 7.x devices. See
+[this Issue](https://github.com/google-deepmind/alphafold3/issues/59) for
+tracking.
+
+CUDA Capability 6.x and 8.x devices other than those listed explicitly here are
+believed to work for AlphaFold 3, but large-scale testing has only been
+performed for the devices mentioned above.
+
 ## Compilation Buckets
 
 To avoid excessive re-compilation of the model, AlphaFold 3 implements
