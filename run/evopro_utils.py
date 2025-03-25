@@ -29,7 +29,7 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
     # Fail early on incompatible devices, only in init.
     gpu_devices = jax.local_devices(backend='gpu')
     if gpu_devices:
-        compute_capability = float(gpu_devices[0].compute_capability)
+        compute_capability = float(gpu_devices[args_dict["gpu_device"]].compute_capability)
         if compute_capability < 6.0:
             raise ValueError(
                 'AlphaFold 3 requires at least GPU compute capability 6.0 (see'
@@ -43,6 +43,12 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
                     'For devices with GPU compute capability 7.x (see'
                     ' https://developer.nvidia.com/cuda-gpus), you must include'
                     ' the --cuda_compute_7x flag.'
+                )
+            if args_dict["flash_attention_implementation"] != "xla":
+                raise ValueError(
+                    'For devices with GPU compute capability 7.x (see '
+                    ' https://developer.nvidia.com/cuda-gpus) the '
+                    ' --flash_attention_implementation must be set to "xla".'
                 )
 
     # Keep notice in init function, only print for proc_id 0.
@@ -58,7 +64,7 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
             break_on_hyphens=False,
             width=80,
         )
-        print('\n'.join(notice))
+        print('\n' + '\n'.join(notice) + '\n')
 
     devices = jax.local_devices(backend='gpu')
     model_runner = ModelRunner(
@@ -66,9 +72,10 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
             flash_attention_implementation=typing.cast(
                 attention.Implementation, args_dict["flash_attention_implementation"]
             ),
-            num_diffusion_samples=1,
+            num_diffusion_samples=1, # To reduce time
+            num_recycles=1, # To reduce time
         ),
-        device=devices[0],
+        device=devices[args_dict["gpu_device"]],
         model_dir=pathlib.Path(args_dict["model_dir"]),
     )
 
