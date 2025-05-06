@@ -292,23 +292,27 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
         # Resolve the ids in case if copies are provided.
         raw_json = _resolve_id_and_copies(raw_json)
 
+        # Grab all of the protein sequences to run MMseqs on once.
+        protein_seqs = [s['protein']['sequence'] for s in raw_json['sequences'] if 'protein' in s]
+        if run_mmseqs and len(protein_seqs) > 0:
+            # Run MMseqs2 on the protein sequences.
+            a3m_paths, template_dirs = run_mmseqs2(
+                os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_unpaired'),
+                protein_seqs,
+                use_templates=True
+            )
+            for i, sequence in enumerate(raw_json['sequences']):
+                if 'protein' in sequence:
+                    if 'unpairedMsa' not in sequence['protein'] and 'unpairedMsaPath' not in sequence['protein']:
+                        set_if_absent(sequence['protein'], 'unpairedMsa', a3m_paths[i])
+                    set_if_absent(sequence['protein'], 'templates', [] if template_dirs[i] is None else template_dirs[i])
+
         # Set default values for empty MSAs and templates
         for sequence in raw_json['sequences']:
             if "protein" in sequence:
                 if ('unpairedMsa' in sequence['protein'] or 'unpairedMsaPath' in sequence['protein']) and 'templates' in sequence['protein']:
                     # If both unpairedMsa (or unpairedMsaPath) and templates are provided, use them and maybe set pairedMsa
                     pass
-                elif run_mmseqs:
-                    # If we don't have unpairedMsa and templates and we want them, then use MMseqs
-                    # to generate them
-                    a3m_path, template_dir = run_mmseqs2(
-                        os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_{sequence["protein"]["id"][0]}'),
-                        sequence['protein']['sequence'],
-                        use_templates=True
-                    )
-                    if 'unpairedMsa' not in sequence['protein'] and 'unpairedMsaPath' not in sequence['protein']:
-                        set_if_absent(sequence['protein'], 'unpairedMsa', a3m_path)
-                    set_if_absent(sequence['protein'], 'templates', [] if template_dir is None else template_dir)
                 else:
                     # Set empty values.
                     set_if_absent(sequence['protein'], 'unpairedMsa', '')
@@ -335,7 +339,6 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                         )
                         sequence['protein']['templates'] = template_hits
 
-                    
                 # Make sure pairedMsa is set no matter what
                 set_if_absent(sequence['protein'], 'pairedMsa', '')
             elif 'rna' in sequence:
