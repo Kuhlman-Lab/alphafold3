@@ -452,7 +452,6 @@ def run_mmseqs2(
         prefix: str,
         sequences: Union[Sequence[str], str],
         use_env: bool = True,
-        use_filter: bool = True,
         use_templates: bool = False,
         num_templates: int = 20,
         host_url: str = 'https://api.colabfold.com'
@@ -463,7 +462,6 @@ def run_mmseqs2(
         prefix (str): Prefix for the output directory that'll store MSAs and templates.
         sequences (Union[Sequence[str], str]): The sequence(s) that'll be used as queries for MMseqs
         use_env (bool, optional): Whether to include the environmental database in the search. Defaults to True.
-        use_filter (bool, optional): TODO. Defaults to True.
         use_templates (bool, optional): Whether to search for templates. Defaults to False.
         num_templates (int, optional): How many templates to search for. Defaults to 20.
         host_url (_type_, optional): URL to ColabFold MMseqs server. Defaults to 'https://api.colabfold.com'.
@@ -515,10 +513,7 @@ def run_mmseqs2(
     sequences = [og_sequences] if isinstance(og_sequences, str) else og_sequences
             
     # Set the mode for MMseqs2.
-    if use_filter:
-        mode = 'env' if use_env else 'all'
-    else:
-        mode = 'env-nofilter' if use_env else 'nofilter'
+    mode = 'env' if use_env else 'all'
 
     # Set up output path.
     out_path = f'{prefix}_{mode}'
