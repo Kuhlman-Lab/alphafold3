@@ -302,7 +302,7 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                 use_templates=True
             )
             a3m_paths_paired, _ = run_mmseqs2(
-                os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_unpaired'),
+                os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_paired'),
                 protein_seqs,
                 use_pairing=True,
                 pairing_strategy='greedy',
@@ -538,16 +538,19 @@ def run_mmseqs2(
         if use_env:
             mode += '-env'
 
-    # Set up output path.
-    out_path = f'{prefix}_{mode}'
-    os.makedirs(out_path, exist_ok=True)
-    tar_gz_file = os.path.join(out_path, 'out.tar.gz')
-    N, REDO = 101, True
-
     # Deduplicate and keep track of order.
     unique_seqs = []
     [unique_seqs.append(seq) for seq in sequences if seq not in unique_seqs]
+    if len(unique_seqs) == 1 and use_pairing:
+        # If only one sequence is provided, pairing is not necessary.
+        return [""], [None]
+    N, REDO = 101, True
     Ms = [N + unique_seqs.index(seq) for seq in sequences]
+    
+    # Set up output path after potentially exiting.
+    out_path = f'{prefix}_{mode}'
+    os.makedirs(out_path, exist_ok=True)
+    tar_gz_file = os.path.join(out_path, 'out.tar.gz')
 
     # Call MMseqs2 API.
     if not os.path.isfile(tar_gz_file):
