@@ -296,15 +296,22 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
         protein_seqs = [s['protein']['sequence'] for s in raw_json['sequences'] if 'protein' in s]
         if run_mmseqs and len(protein_seqs) > 0:
             # Run MMseqs2 on the protein sequences.
-            a3m_paths, template_dirs = run_mmseqs2(
+            a3m_paths_unpaired, template_dirs = run_mmseqs2(
                 os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_unpaired'),
                 protein_seqs,
                 use_templates=True
             )
+            a3m_paths_paired, _ = run_mmseqs2(
+                os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_unpaired'),
+                protein_seqs,
+                use_pairing=True,
+                pairing_strategy='greedy',
+                use_templates=False
+            )
             for i, sequence in enumerate(raw_json['sequences']):
                 if 'protein' in sequence:
                     if 'unpairedMsa' not in sequence['protein'] and 'unpairedMsaPath' not in sequence['protein']:
-                        set_if_absent(sequence['protein'], 'unpairedMsa', a3m_paths[i])
+                        set_if_absent(sequence['protein'], 'unpairedMsa', a3m_paths_unpaired[i])
                     set_if_absent(sequence['protein'], 'templates', [] if template_dirs[i] is None else template_dirs[i])
 
         # Set default values for empty MSAs and templates
@@ -454,6 +461,8 @@ def run_mmseqs2(
         use_env: bool = True,
         use_templates: bool = False,
         num_templates: int = 20,
+        use_pairing: bool = False,
+        pairing_strategy: str = 'greedy',
         host_url: str = 'https://api.colabfold.com'
         ) -> Tuple[Sequence[str], Sequence[Optional[str]]]:
     """Computes MSAs and templates by querying ColabFold MMseqs2 server.
@@ -464,7 +473,9 @@ def run_mmseqs2(
         use_env (bool, optional): Whether to include the environmental database in the search. Defaults to True.
         use_templates (bool, optional): Whether to search for templates. Defaults to False.
         num_templates (int, optional): How many templates to search for. Defaults to 20.
-        host_url (_type_, optional): URL to ColabFold MMseqs server. Defaults to 'https://api.colabfold.com'.
+        use_pairing (bool, optional): Whether to generate a species-paired MSA. Defaults to False.
+        pairing_strategy (str, optional): The strategy to use for pairing. Choices are ['greedy', 'complete']. Defaults to 'greedy'.
+        host_url (str, optional): URL to ColabFold MMseqs server. Defaults to 'https://api.colabfold.com'.
 
     Raises:
         Exception: Errors related to MMseqs. Sometimes these can be solved by simply trying again.
@@ -473,7 +484,7 @@ def run_mmseqs2(
         Tuple[Sequence[str], Sequence[Optional[str]]]: A Tuple of (MSAs, templates). MSAs are the paths to the
             MMseqs MSA generated for each sequence; similarly templates point to a directory of templates.
     """
-    submission_endpoint = 'ticket/msa'
+    submission_endpoint = 'ticket/msa' if not use_pairing else 'ticket/pair'
     og_sequences = sequences
     
     def submit(seqs: Sequence[str], mode: str, N=101) -> Dict[str, str]:
@@ -514,6 +525,18 @@ def run_mmseqs2(
             
     # Set the mode for MMseqs2.
     mode = 'env' if use_env else 'all'
+    if use_pairing:
+        use_templates = False
+        mode = 'pair'
+        if pairing_strategy == 'greedy':
+            mode += 'greedy'
+        elif pairing_strategy == 'complete':
+            mode += 'complete'
+        else:
+            raise ValueError(f"Unrecognized pairing strategy: {pairing_strategy}. "
+                             "Must be either 'greedy' or 'complete'.")
+        if use_env:
+            mode += '-env'
 
     # Set up output path.
     out_path = f'{prefix}_{mode}'
@@ -563,10 +586,13 @@ def run_mmseqs2(
         download(ID, tar_gz_file)
 
     # Get and extract a list of .a3m files.
-    a3m_files = [os.path.join(out_path, 'uniref.a3m')]
-    if use_env:
-        a3m_files.append(
-            os.path.join(out_path, 'bfd.mgnify30.metaeuk30.smag30.a3m'))
+    if use_pairing:
+        a3m_files = [os.path.join(out_path, 'pair.a3m')]
+    else:
+        a3m_files = [os.path.join(out_path, 'uniref.a3m')]
+        if use_env:
+            a3m_files.append(
+                os.path.join(out_path, 'bfd.mgnify30.metaeuk30.smag30.a3m'))
     if not os.path.isfile(a3m_files[0]):
         with tarfile.open(tar_gz_file) as tar_gz:
             tar_gz.extractall(out_path)
