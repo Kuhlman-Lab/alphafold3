@@ -1,0 +1,30 @@
+{
+    "name": "1A3B",
+    "sequences": [
+      {
+        "protein": {
+          "id": ["A"],
+          "sequence": "TFGSGEADCGLRPLFEKKSLEDKTERELLESYIDGR"
+        }
+      },
+      {
+        "protein": {
+          "id": ["B"],
+          "sequence": "IVEGSDAEIGMSPWQVMLFRKSPQELLCGASLISDRWVLTAAHCLLYPPWDKNFTENDLLVRIGKHSRTRYERNIEKISMLEKIYIHPRYNWRENLDRDIALMKLKKPVAFSDYIHPVCLPDRETAASLLQAGYKGRVTGWGNLKETWTANVGKGQPSVLQVVNLPIVERPVCKDSTRIRITDNMFCAGYKPDEGKRGDACEGDSGGPFVMKSPFNNRWYQMGIVSWGEGCDRDGKYGFYTHVFRLKKWIQKVIDQFGE"
+        }
+      },
+      {
+        "protein": {
+          "id": ["C"],
+          "sequence": "GGQSHNDGDFEEIPEEYL"
+        }
+      },
+      {
+        "ligand": {
+          "id": ["D"],
+          "ccdCodes": ["T29"]
+        }
+      }
+    ],
+    "modelSeeds": [1]
+  }
