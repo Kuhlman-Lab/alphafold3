@@ -553,14 +553,18 @@ def main(args_dict: Dict[str, Any]) -> None:
             pathlib.Path(args_dict["input_dir"]),
             run_mmseqs=args_dict["run_mmseqs"],
             output_dir=args_dict["output_dir"],
-            max_template_date=args_dict["max_template_date"]
+            max_template_date=args_dict["max_template_date"],
+            msa_mode=args_dict["msa_mode"],
+            pairing_strategy=args_dict["pairing_strategy"],
         )
     elif args_dict["json_path"] is not None:
         fold_inputs = load_fold_inputs_from_path(
             pathlib.Path(args_dict["json_path"]),
             run_mmseqs=args_dict["run_mmseqs"],
             output_dir=args_dict["output_dir"],
-            max_template_date=args_dict["max_template_date"]
+            max_template_date=args_dict["max_template_date"],
+            msa_mode=args_dict["msa_mode"],
+            pairing_strategy=args_dict["pairing_strategy"],
         )
     else:
         raise AssertionError(

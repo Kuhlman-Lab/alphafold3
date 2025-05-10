@@ -1,0 +1,30 @@
+{
+    "name": "5DOB",
+    "sequences": [
+      {
+        "protein": {
+          "id": ["A"],
+          "sequence": "GPLGSMLKLSELHDVFQRHPELELKYLNMMKMAITGKESICLPFNFHSHRQHTCLDISPYGNEQVSRIACTSCEDNRILPTASDAMVAFINQTSNIMKNRNFYYGFCKSSELLKLSTNQPPIFQIYYLLHAANHDIVPFMHAEDGRLHMHVIFENPDVHIPCDCITQMLTAAREDYSVTLNIVRDHVVISVLCHAVSASSVKIDVTILQRKIDEMDIPNDVSESFERYKELIQELCQ"
+        }
+      },
+      {
+        "protein": {
+          "id": ["B"],
+          "sequence": "NKVLHQDLVQATRRILKLGPSELRVTDAGLICKNPNYSVCDAMLKTDTVYCVEYLLSYWESRADHVPCFIFKNTGCAVSLCCFVRAPVALVSPARHVGEFNVLKVNESLIVTLKDIEEIKPSAYGVLTKCVVRKSNSASVFNIELIAFGPENEGEYENLLRELYA"
+        }
+      },
+      {
+        "ligand": {
+          "id": ["C"],
+          "ccdCodes": ["ZN"]
+        }
+      },
+      {
+        "ligand": {
+          "id": ["D"],
+          "ccdCodes": ["CA"]
+        }
+      }
+    ],
+    "modelSeeds": [1]
+  }

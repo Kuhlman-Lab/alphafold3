@@ -165,6 +165,22 @@ def get_af3_parser() -> FileArgumentParser:
         help="If provided, MMseqs2 will be used to generate MSAs and "
         "templates for protein queries that have no custom inputs specified."
     )
+    parser.add_argument(
+        "--msa_mode",
+        type=str,
+        default="paired+unpaired",
+        choices=["paired+unpaired", "unpaired", "paired"],
+        help="The MSA mode to use. Options include ['paired+unpaired', 'unpaired', 'paired']. "
+        "Defaults to 'paired+unpaired'."
+    )
+    parser.add_argument(
+        "--pairing_strategy",
+        type=str,
+        default="greedy",
+        choices=["greedy", "complete"],
+        help="The strategy to use for pairing. Choices are ['greedy', 'complete']. "
+        "Defaults to 'greedy'."
+    )
     
     # Template search configuration.
     parser.add_argument(
@@ -264,7 +280,54 @@ def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
     return vars(args)
 
 
-def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> str:
+def _resolve_single_seq_msa(paired_msa_dict: Dict[str, str]) -> Dict[str, str]:
+    """Checks if the paired MSA is a single sequence and if so returns an empty dict.
+
+    Args:
+        paired_msa_dict (Dict[str, str]): Dictionary containing the paired MSA.
+
+    Returns:
+        Dict[str, str]: Dictionary containing the resolved paired MSA.
+    """
+    single_seq_msas = []
+    for seq in paired_msa_dict:
+        if len(paired_msa_dict[seq].split('\n')) == 2:
+            single_seq_msas.append(seq)
+    
+    if set(single_seq_msas) == set(paired_msa_dict.keys()):
+        # If all MSAs are single sequences, return an empty dict
+        return {}
+    return paired_msa_dict
+
+
+def _combine_msas(paired_msa_dict: Dict[str, str], unpaired_msa_dict: Dict[str, str]) -> Dict[str, str]:
+    """Combines paired and unpaired MSAs into a single dictionary.
+
+    Args:
+        paired_msa_dict (Dict[str, str]): Dictionary containing the paired MSA.
+        unpaired_msa_dict (Dict[str, str]): Dictionary containing the unpaired MSA.
+
+    Returns:
+        Dict[str, str]: Combined dictionary of MSAs.
+    """
+    assert set(paired_msa_dict.keys()) == set(unpaired_msa_dict.keys())
+
+    def remove_first_seq(msa: str) -> str:
+        """Removes the first sequence/description lines from the MSA."""
+        lines = msa.split('\n')
+        return '\n'.join(lines[2:])
+
+    combined_msa_dict = {}
+    for seq in paired_msa_dict:
+        if seq in unpaired_msa_dict:
+            combined_msa_dict[seq] = paired_msa_dict[seq] + '\n' + remove_first_seq(unpaired_msa_dict[seq])
+        else:
+            combined_msa_dict[seq] = paired_msa_dict[seq]
+    
+    return combined_msa_dict
+
+
+def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01', msa_mode: str = 'paired+unpaired', pairing_strategy: str = 'greedy') -> str:
     """Loads a JSON-formatted string and applies some default values if they're not present.
 
     Args:
@@ -273,10 +336,14 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
             protein chains. Defaults to False.
         output_dir (str, optional): Place that'll store MMseqs2 MSAs and templates. Defaults to ''.
         max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
+        msa_mode (str, optional): The MSA mode to use. Options include ['paired+unpaired', 'unpaired', 'paired']. Defaults to 'paired+unpaired'. 
+        pairing_strategy (str, optional): The strategy to use for pairing. Choices are ['greedy', 'complete']. Defaults to 'greedy'.
 
     Returns:
         str: A modified JSON-formatted string containing some extra defaults.
     """
+    msa_mode = msa_mode.split('+')
+
     # Load the json_str
     raw_json = json.loads(json_str)
     
@@ -292,23 +359,43 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
         # Resolve the ids in case if copies are provided.
         raw_json = _resolve_id_and_copies(raw_json)
 
+        # Grab all of the protein sequences to run MMseqs on once.
+        protein_seqs = [s['protein']['sequence'] for s in raw_json['sequences'] if 'protein' in s]
+        if run_mmseqs and len(protein_seqs) > 0:
+            # Run MMseqs2 on the protein sequences.
+            a3m_paths_unpaired, template_dirs = run_mmseqs2(
+                os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_unpaired'),
+                protein_seqs,
+                use_templates=True
+            )
+            if 'paired' in msa_mode:
+                # Run MMseqs2 on the protein sequences with pairing.
+                a3m_paths_paired, _ = run_mmseqs2(
+                    os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_paired'),
+                    protein_seqs,
+                    use_pairing=True,
+                    pairing_strategy=pairing_strategy,
+                    use_templates=False
+                )
+            else:
+                a3m_paths_paired = [""]
+
+            # Set the MSAs and templates.
+            for i, sequence in enumerate(raw_json['sequences']):
+                if 'protein' in sequence:
+                    if 'unpaired' in msa_mode:
+                        if 'unpairedMsaPath' not in sequence['protein']:
+                            set_if_absent(sequence['protein'], 'unpairedMsa', a3m_paths_unpaired[i])
+                    if a3m_paths_paired != [""] and 'pairedMsaPath' not in sequence['protein']:
+                        set_if_absent(sequence['protein'], 'pairedMsa', a3m_paths_paired[i])
+                    set_if_absent(sequence['protein'], 'templates', [] if template_dirs[i] is None else template_dirs[i])          
+
         # Set default values for empty MSAs and templates
         for sequence in raw_json['sequences']:
             if "protein" in sequence:
                 if ('unpairedMsa' in sequence['protein'] or 'unpairedMsaPath' in sequence['protein']) and 'templates' in sequence['protein']:
                     # If both unpairedMsa (or unpairedMsaPath) and templates are provided, use them and maybe set pairedMsa
                     pass
-                elif run_mmseqs:
-                    # If we don't have unpairedMsa and templates and we want them, then use MMseqs
-                    # to generate them
-                    a3m_path, template_dir = run_mmseqs2(
-                        os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_{sequence["protein"]["id"][0]}'),
-                        sequence['protein']['sequence'],
-                        use_templates=True
-                    )
-                    if 'unpairedMsa' not in sequence['protein'] and 'unpairedMsaPath' not in sequence['protein']:
-                        set_if_absent(sequence['protein'], 'unpairedMsa', a3m_path)
-                    set_if_absent(sequence['protein'], 'templates', [] if template_dir is None else template_dir)
                 else:
                     # Set empty values.
                     set_if_absent(sequence['protein'], 'unpairedMsa', '')
@@ -318,11 +405,31 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                     # Move unpairedMsaPath to unpairedMsa for unified parsing of MSAs
                     sequence['protein']['unpairedMsa'] = sequence['protein']['unpairedMsaPath']
                     del sequence['protein']['unpairedMsaPath']
-                    
-                if sequence['protein']['unpairedMsa'] != "" and os.path.exists(sequence['protein']['unpairedMsa']):
-                    # If unpairedMsa isn't empty and is a path that exists, parse it as a custom MSA
-                    msa_dict = get_custom_msa_dict(sequence['protein']['unpairedMsa'])
-                    sequence['protein']['unpairedMsa'] = msa_dict.get(sequence['protein']['sequence'], "")
+
+                if 'paired' in msa_mode and 'pairedMsa' in sequence['protein']:
+                    if sequence['protein']['pairedMsa'] != "" and os.path.exists(sequence['protein']['pairedMsa']):
+                        # If pairedMsa isn't empty and is a path that exists, parse it as a custom MSA
+                        msa_dict = get_custom_msa_dict(sequence['protein']['pairedMsa'])
+                        msa_dict = _resolve_single_seq_msa(msa_dict)
+                        del sequence['protein']['pairedMsa']
+
+                        if 'unpaired' not in msa_mode:
+                            # If not using unpaired MSAs, set the pairedMsa to the unpaired MSA
+                            sequence['protein']['unpairedMsa'] = msa_dict.get(sequence['protein']['sequence'], "")
+                else:
+                    msa_dict = {}
+
+                if 'unpaired' in msa_mode:
+                    if sequence['protein']['unpairedMsa'] != "" and os.path.exists(sequence['protein']['unpairedMsa']):
+                        # If unpairedMsa isn't empty and is a path that exists, parse it as a custom MSA
+                        if msa_dict == {}:
+                            msa_dict = get_custom_msa_dict(sequence['protein']['unpairedMsa'])
+                        else:
+                            # If msa_dict isn't {}, then a paired MSA was found. We need to combine
+                            # it with the unpaired MSA since msa_mode must be paired+unpaired
+                            unpaired_msa_dict = get_custom_msa_dict(sequence['protein']['unpairedMsa'])
+                            msa_dict = _combine_msas(msa_dict, unpaired_msa_dict)
+                        sequence['protein']['unpairedMsa'] = msa_dict.get(sequence['protein']['sequence'], "")
                 
                 if sequence['protein']['templates'] != [] and type(sequence['protein']['templates']) == str:
                     if os.path.exists(sequence['protein']['templates']):
@@ -335,7 +442,6 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                         )
                         sequence['protein']['templates'] = template_hits
 
-                    
                 # Make sure pairedMsa is set no matter what
                 set_if_absent(sequence['protein'], 'pairedMsa', '')
             elif 'rna' in sequence:
@@ -379,7 +485,7 @@ def _resolve_id_and_copies(raw_json: Dict[str, Any]) -> Dict[str, Any]:
     return raw_json
         
 
-def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Iterator[Input]:
+def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01', msa_mode: str = 'paired+unpaired', pairing_strategy: str = 'greedy') -> Iterator[Input]:
     """Loads multiple fold inputs from a JSON path (or string of a JSON).
 
     Args:
@@ -388,6 +494,8 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
         run_mmseqs (bool, optional): Whether to run MMseqs on protein chains. Defaults to False.
         output_dir (str, optional): Place that'll store MMseqs MSAs and templates. Defaults to ''.
         max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
+        msa_mode (str, optional): The MSA mode to use. Options include ['paired+unpaired', 'unpaired', 'paired']. Defaults to 'paired+unpaired'.
+        pairing_strategy (str, optional): The strategy to use for pairing. Choices are ['greedy', 'complete']. Defaults to 'greedy'.
 
     Raises:
         ValueError: Fails if we cannot load json_path as an AlphaFold3 JSON
@@ -401,7 +509,7 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
             json_str = f.read()
     else:
         json_str = json_path
-    raw_json = set_json_defaults(json_str, run_mmseqs, output_dir, max_template_date)
+    raw_json = set_json_defaults(json_str, run_mmseqs, output_dir, max_template_date, msa_mode, pairing_strategy)
     json_str = json.dumps(raw_json)
 
     if isinstance(raw_json, list):
@@ -426,7 +534,7 @@ def load_fold_inputs_from_path(json_path: Union[pathlib.Path, str], run_mmseqs: 
             ) from e
 
 
-def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01') -> Iterator[Input]:
+def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False, output_dir: str = '', max_template_date: str = '3000-01-01', msa_mode: str = 'paired+unpaired', pairing_strategy: str = 'greedy') -> Iterator[Input]:
     """Loads multiple fold inputs from all JSON files in a given input_dir.
 
     Args:
@@ -434,6 +542,8 @@ def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False,
         run_mmseqs (bool, optional): Whether to run MMseq2 on protein chains. Defaults to False.
         output_dir (str, optional): Place that'll store MMseqs2 MSAs and templates. Defaults to ''.
         max_template_date (str, optional): Maximum date for a template to be used. Defaults to '3000-01-01'.
+        msa_mode (str, optional): The MSA mode to use. Options include ['paired+unpaired', 'unpaired', 'paired']. Defaults to 'paired+unpaired'.
+        pairing_strategy (str, optional): The strategy to use for pairing. Choices are ['greedy', 'complete']. Defaults to 'greedy'.
 
     Yields:
         The fold inputs from all JSON files in the input directory.
@@ -442,16 +552,17 @@ def load_fold_inputs_from_dir(input_dir: pathlib.Path, run_mmseqs: bool = False,
         if not file_path.is_file():
             continue
 
-        yield from load_fold_inputs_from_path(file_path, run_mmseqs, output_dir, max_template_date)
+        yield from load_fold_inputs_from_path(file_path, run_mmseqs, output_dir, max_template_date, msa_mode, pairing_strategy)
 
 
 def run_mmseqs2(
         prefix: str,
         sequences: Union[Sequence[str], str],
         use_env: bool = True,
-        use_filter: bool = True,
         use_templates: bool = False,
         num_templates: int = 20,
+        use_pairing: bool = False,
+        pairing_strategy: str = 'greedy',
         host_url: str = 'https://api.colabfold.com'
         ) -> Tuple[Sequence[str], Sequence[Optional[str]]]:
     """Computes MSAs and templates by querying ColabFold MMseqs2 server.
@@ -460,10 +571,11 @@ def run_mmseqs2(
         prefix (str): Prefix for the output directory that'll store MSAs and templates.
         sequences (Union[Sequence[str], str]): The sequence(s) that'll be used as queries for MMseqs
         use_env (bool, optional): Whether to include the environmental database in the search. Defaults to True.
-        use_filter (bool, optional): TODO. Defaults to True.
         use_templates (bool, optional): Whether to search for templates. Defaults to False.
         num_templates (int, optional): How many templates to search for. Defaults to 20.
-        host_url (_type_, optional): URL to ColabFold MMseqs server. Defaults to 'https://api.colabfold.com'.
+        use_pairing (bool, optional): Whether to generate a species-paired MSA. Defaults to False.
+        pairing_strategy (str, optional): The strategy to use for pairing. Choices are ['greedy', 'complete']. Defaults to 'greedy'.
+        host_url (str, optional): URL to ColabFold MMseqs server. Defaults to 'https://api.colabfold.com'.
 
     Raises:
         Exception: Errors related to MMseqs. Sometimes these can be solved by simply trying again.
@@ -472,7 +584,7 @@ def run_mmseqs2(
         Tuple[Sequence[str], Sequence[Optional[str]]]: A Tuple of (MSAs, templates). MSAs are the paths to the
             MMseqs MSA generated for each sequence; similarly templates point to a directory of templates.
     """
-    submission_endpoint = 'ticket/msa'
+    submission_endpoint = 'ticket/msa' if not use_pairing else 'ticket/pair'
     og_sequences = sequences
     
     def submit(seqs: Sequence[str], mode: str, N=101) -> Dict[str, str]:
@@ -512,21 +624,33 @@ def run_mmseqs2(
     sequences = [og_sequences] if isinstance(og_sequences, str) else og_sequences
             
     # Set the mode for MMseqs2.
-    if use_filter:
-        mode = 'env' if use_env else 'all'
-    else:
-        mode = 'env-nofilter' if use_env else 'nofilter'
-
-    # Set up output path.
-    out_path = f'{prefix}_{mode}'
-    os.makedirs(out_path, exist_ok=True)
-    tar_gz_file = os.path.join(out_path, 'out.tar.gz')
-    N, REDO = 101, True
+    mode = 'env' if use_env else 'all'
+    if use_pairing:
+        use_templates = False
+        mode = 'pair'
+        if pairing_strategy == 'greedy':
+            mode += 'greedy'
+        elif pairing_strategy == 'complete':
+            mode += 'complete'
+        else:
+            raise ValueError(f"Unrecognized pairing strategy: {pairing_strategy}. "
+                             "Must be either 'greedy' or 'complete'.")
+        if use_env:
+            mode += '-env'
 
     # Deduplicate and keep track of order.
     unique_seqs = []
     [unique_seqs.append(seq) for seq in sequences if seq not in unique_seqs]
+    if len(unique_seqs) == 1 and use_pairing:
+        # If only one sequence is provided, pairing is not necessary.
+        return [""], [None]
+    N, REDO = 101, True
     Ms = [N + unique_seqs.index(seq) for seq in sequences]
+    
+    # Set up output path after potentially exiting.
+    out_path = f'{prefix}_{mode}'
+    os.makedirs(out_path, exist_ok=True)
+    tar_gz_file = os.path.join(out_path, 'out.tar.gz')
 
     # Call MMseqs2 API.
     if not os.path.isfile(tar_gz_file):
@@ -565,10 +689,13 @@ def run_mmseqs2(
         download(ID, tar_gz_file)
 
     # Get and extract a list of .a3m files.
-    a3m_files = [os.path.join(out_path, 'uniref.a3m')]
-    if use_env:
-        a3m_files.append(
-            os.path.join(out_path, 'bfd.mgnify30.metaeuk30.smag30.a3m'))
+    if use_pairing:
+        a3m_files = [os.path.join(out_path, 'pair.a3m')]
+    else:
+        a3m_files = [os.path.join(out_path, 'uniref.a3m')]
+        if use_env:
+            a3m_files.append(
+                os.path.join(out_path, 'bfd.mgnify30.metaeuk30.smag30.a3m'))
     if not os.path.isfile(a3m_files[0]):
         with tarfile.open(tar_gz_file) as tar_gz:
             tar_gz.extractall(out_path)
