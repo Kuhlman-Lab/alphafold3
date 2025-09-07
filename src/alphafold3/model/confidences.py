@@ -552,7 +552,7 @@ def pae_metrics(
 
   pae_ichain, pae_xchain = reduce_chain_pair_fn(chain_pair_contact_weighted)
   iptm_ichain, iptm_xchain = reduce_chain_pair_fn(chain_pair_iptm)
-  actifptm_ichain, actifptm_xchain = reduce_chain_pair_fn(chain_pair_actifptm)
+  _, actifptm_xchain = reduce_chain_pair_fn(chain_pair_actifptm)
 
   ret.update({
       'chain_pair_iptm': chain_pair_iptm,
@@ -561,7 +561,6 @@ def pae_metrics(
       'pae_ichain': pae_ichain,
       'pae_xchain': pae_xchain,
 	  'chain_pair_actifptm': chain_pair_actifptm,
-	  'actifptm_ichain': actifptm_ichain,
 	  'actifptm_xchain': actifptm_xchain,
   })
 
