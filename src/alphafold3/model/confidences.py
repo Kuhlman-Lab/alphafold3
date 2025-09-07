@@ -629,7 +629,7 @@ def predicted_tm_score(
   if interface:
     pair_mask = pair_mask * (asym_id[:, None] != asym_id[None, :])
 
-  # For actifptm, weight	 by contact probabilities
+  # For actifptm, weight by contact probabilities
   if contact_probs is not None:
 	  if contact_probs.shape != (num_tokens, num_tokens):
 	    raise ValueError(
