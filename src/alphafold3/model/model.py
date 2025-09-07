@@ -174,6 +174,7 @@ def _compute_ptm(
     asym_id: np.ndarray,
     pae_single_mask: np.ndarray,
     interface: bool,
+	contact_probs: np.ndarray | None = None,
 ) -> np.ndarray:
   """Computes the pTM metrics from PAE."""
   return np.stack(
@@ -183,6 +184,7 @@ def _compute_ptm(
               asym_id=asym_id,
               pair_mask=pae_single_mask[:num_tokens, :num_tokens],
               interface=interface,
+              contact_probs=contact_probs[:num_tokens, :num_tokens] if contact_probs is not None else None
           )
           for tm_adjusted_pae in result['tmscore_adjusted_pae_global']
       ],
@@ -195,6 +197,7 @@ def _compute_chain_pair_iptm(
     asym_ids: np.ndarray,
     mask: np.ndarray,
     tm_adjusted_pae: np.ndarray,
+	contact_probs: np.ndarray | None = None,
 ) -> np.ndarray:
   """Computes the chain pair ipTM metrics from PAE."""
   return np.stack(
@@ -203,6 +206,7 @@ def _compute_chain_pair_iptm(
               tm_adjusted_pae=sample_tm_adjusted_pae[:num_tokens],
               asym_id=asym_ids[:num_tokens],
               pair_mask=mask[:num_tokens, :num_tokens],
+              contact_probs=contact_probs[:num_tokens, :num_tokens] if contact_probs is not None else None
           )
           for sample_tm_adjusted_pae in tm_adjusted_pae
       ],
@@ -224,6 +228,7 @@ class Model(hk.Module):
     heads: 'Model.HeadsConfig' = base_config.autocreate()
     num_recycles: int = 10
     return_embeddings: bool = False
+    return_distogram: bool = False
 
   def __init__(self, config: Config, name: str = 'diffuser'):
     super().__init__(name=name)
@@ -327,7 +332,7 @@ class Model(hk.Module):
 
     distogram = distogram_head.DistogramHead(
         self.config.heads.distogram, self.global_config
-    )(batch, embeddings)
+    )(batch, embeddings, return_distogram=self.config.return_distogram)
 
     output = {
         'diffusion_samples': samples,
@@ -471,11 +476,32 @@ class Model(hk.Module):
       fraction_disordered = list(
           executor.map(confidences.fraction_disordered, pred_structures)
       )
+	    
+	# add actifptm calculation
+    actifptm = _compute_ptm(
+        result=result,
+        num_tokens=num_tokens,
+        asym_id=batch.token_features.asym_id[:num_tokens],
+        pae_single_mask=pae_single_mask,
+        interface=True,
+	    contact_probs=contact_probs
+    )
+    chain_pair_actifptm = _compute_chain_pair_iptm(
+        num_tokens=num_tokens,
+		asym_ids=batch.token_features.asym_id,
+		mask=pae_single_mask,
+		tm_adjusted_pae=result['tmscore_adjusted_pae_interface'],
+	    contact_probs=contact_probs
+	)
+    
+    actifptm_ichain = chain_pair_actifptm.diagonal(axis1=-2, axis2=-1)
+    actifptm_xchain = confidences.get_iptm_xchain(chain_pair_actifptm)
 
     for idx, pred_structure in enumerate(pred_structures):
       ranking_score = confidences.get_ranking_score(
           ptm=ptm[idx],
           iptm=iptm[idx],
+	      actifptm=actifptm[idx],
           fraction_disordered_=fraction_disordered[idx],
           has_clash_=has_clash[idx],
       )
@@ -510,6 +536,10 @@ class Model(hk.Module):
               'iptm_xchain': iptm_xchain[idx],
               'token_chain_ids': chain_ids,
               'token_res_ids': res_ids,
+	          'actifptm': actifptm[idx],
+              'chain_pair_actifptm': chain_pair_actifptm[idx],
+			  'actifptm_ichain': actifptm_ichain[idx],
+			  'actifptm_xchain': actifptm_xchain[idx],
           },
           model_id=result['__identifier__'],
           debug_outputs={},
