@@ -524,6 +524,7 @@ def pae_metrics(
       ],
       axis=0,
   )
+  chain_pair_actifptm[:, np.arange(2), np.arange(2)] = np.nan
 
   num_chain_tokens = np.array(
       [sum(asym_ids == asym_id) for asym_id in unique_asym_ids]
