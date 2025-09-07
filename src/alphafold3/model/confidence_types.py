@@ -207,6 +207,7 @@ class StructureConfidenceSummary:
   chain_pair_iptm: np.ndarray
   chain_ptm: np.ndarray
   chain_iptm: np.ndarray
+  actifptm: float | None = None
 
   @classmethod
   def from_inference_result(
@@ -216,6 +217,7 @@ class StructureConfidenceSummary:
     return cls(
         ptm=float(inference_result.metadata['ptm']),
         iptm=float(inference_result.metadata['iptm']),
+	    actifptm=float(inference_result.metadata['actifptm']),
         ranking_score=float(inference_result.metadata['ranking_score']),
         fraction_disordered=float(
             inference_result.metadata['fraction_disordered']

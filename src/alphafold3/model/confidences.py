@@ -511,6 +511,19 @@ def pae_metrics(
       ],
       axis=0,
   )
+  
+  chain_pair_actifptm = np.stack(
+      [
+          chain_pairwise_predicted_tm_scores(
+              tm_adjusted_pae=sample_tm_adjusted_pae[:num_tokens],
+              asym_id=asym_ids[:num_tokens],
+              pair_mask=mask[:num_tokens, :num_tokens],
+              contact_probs=contact_probs[:num_tokens, :num_tokens],
+          )
+          for sample_tm_adjusted_pae in tm_adjusted_pae
+      ],
+      axis=0,
+  )
 
   num_chain_tokens = np.array(
       [sum(asym_ids == asym_id) for asym_id in unique_asym_ids]
@@ -539,6 +552,7 @@ def pae_metrics(
 
   pae_ichain, pae_xchain = reduce_chain_pair_fn(chain_pair_contact_weighted)
   iptm_ichain, iptm_xchain = reduce_chain_pair_fn(chain_pair_iptm)
+  actifptm_ichain, actifptm_xchain = reduce_chain_pair_fn(chain_pair_actifptm)
 
   ret.update({
       'chain_pair_iptm': chain_pair_iptm,
@@ -546,6 +560,9 @@ def pae_metrics(
       'iptm_xchain': iptm_xchain,
       'pae_ichain': pae_ichain,
       'pae_xchain': pae_xchain,
+	  'chain_pair_actifptm': chain_pair_actifptm,
+	  'actifptm_ichain': actifptm_ichain,
+	  'actifptm_xchain': actifptm_xchain,
   })
 
   return ret
@@ -572,6 +589,7 @@ def predicted_tm_score(
     pair_mask: np.ndarray,
     asym_id: np.ndarray,
     interface: bool = False,
+	contact_probs: np.ndarray = None,
 ) -> float:
   """Computes predicted TM alignment or predicted interface TM alignment score.
 
@@ -611,6 +629,15 @@ def predicted_tm_score(
   if interface:
     pair_mask = pair_mask * (asym_id[:, None] != asym_id[None, :])
 
+  # For actifptm, weight	 by contact probabilities
+  if contact_probs is not None:
+	  if contact_probs.shape != (num_tokens, num_tokens):
+	    raise ValueError(
+	        f'Bad contact_probs shape, expected ({num_tokens, num_tokens}), got '
+	        f'{contact_probs.shape}.'
+	    )
+	  pair_mask = pair_mask * contact_probs
+
   # Ions and other ligands with colinear atoms have ill-defined frames.
   if pair_mask.sum() == 0:
     return np.nan
@@ -626,6 +653,7 @@ def chain_pairwise_predicted_tm_scores(
     tm_adjusted_pae: np.ndarray,
     pair_mask: np.ndarray,
     asym_id: np.ndarray,
+	contact_probs: np.ndarray = None,
 ) -> np.ndarray:
   """Compute predicted TM (pTM) between each pair of chains independently.
 
@@ -657,6 +685,7 @@ def chain_pairwise_predicted_tm_scores(
           pair_mask=pair_mask[indices],
           asym_id=asym_id[mask],
           interface=is_interface,
+          contact_probs=contact_probs[indices] if contact_probs is not None else None,
       )
       all_pairs_iptms[i, i + j] = iptm
       all_pairs_iptms[i + j, i] = iptm
