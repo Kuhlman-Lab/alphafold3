@@ -494,7 +494,8 @@ class Model(hk.Module):
 	    contact_probs=contact_probs
 	)
     
-    actifptm_ichain = chain_pair_actifptm.diagonal(axis1=-2, axis2=-1)
+    diag_size = chain_pair_actifptm.shape[1]
+    chain_pair_actifptm[:, np.arange(diag_size), np.arange(diag_size)] = np.nan
     actifptm_xchain = confidences.get_iptm_xchain(chain_pair_actifptm)
 
     for idx, pred_structure in enumerate(pred_structures):
