@@ -501,7 +501,6 @@ class Model(hk.Module):
       ranking_score = confidences.get_ranking_score(
           ptm=ptm[idx],
           iptm=iptm[idx],
-	      actifptm=actifptm[idx],
           fraction_disordered_=fraction_disordered[idx],
           has_clash_=has_clash[idx],
       )
