@@ -182,9 +182,9 @@ class DataPipelineTest(test_utils.StructureTestCase):
         resources.ROOT / f'test_data/{filename}'
     ).path()
     with open(golden_path, 'r') as golden_file:
-      golden_text = golden_file.read()
+      golden_text = golden_file.read().strip()
     with open(result_path, 'r') as result_file:
-      result_text = result_file.read()
+      result_text = result_file.read().strip()
 
     diff = _generate_diff(result_text, golden_text)
 

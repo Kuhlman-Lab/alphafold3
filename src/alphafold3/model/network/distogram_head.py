@@ -47,6 +47,7 @@ class DistogramHead(hk.Module):
       self,
       batch: feat_batch.Batch,
       embeddings: dict[str, jnp.ndarray],
+      return_distogram: bool = False,
   ) -> dict[str, jnp.ndarray]:
     pair_act = embeddings['pair']
     seq_mask = batch.token_features.mask.astype(bool)
@@ -75,7 +76,8 @@ class DistogramHead(hk.Module):
     )
     contact_probs = pair_mask * contact_probs
 
-    return {
-        'bin_edges': breaks,
-        'contact_probs': contact_probs,
-    }
+    return_dict = {'bin_edges': breaks, 'contact_probs': contact_probs}
+    if return_distogram:
+      return_dict['distogram'] = logits
+
+    return return_dict

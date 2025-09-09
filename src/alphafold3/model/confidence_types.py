@@ -207,6 +207,10 @@ class StructureConfidenceSummary:
   chain_pair_iptm: np.ndarray
   chain_ptm: np.ndarray
   chain_iptm: np.ndarray
+  actifptm: float
+  chain_pair_actifptm: np.ndarray
+  chain_actifptm: np.ndarray
+  
 
   @classmethod
   def from_inference_result(
@@ -225,6 +229,9 @@ class StructureConfidenceSummary:
         chain_pair_iptm=inference_result.metadata['chain_pair_iptm'],
         chain_ptm=inference_result.metadata['iptm_ichain'],
         chain_iptm=inference_result.metadata['iptm_xchain'],
+	actifptm=float(inference_result.metadata['actifptm']),
+	chain_pair_actifptm=inference_result.metadata['chain_pair_actifptm'],
+	chain_actifptm=inference_result.metadata['actifptm_xchain'],
     )
 
   @classmethod
