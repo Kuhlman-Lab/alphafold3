@@ -226,5 +226,6 @@
     }
   },
   "num_recycles": 10,
+  "return_distogram": false,
   "return_embeddings": false
 }
