@@ -396,6 +396,18 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                 if ('unpairedMsa' in sequence['protein'] or 'unpairedMsaPath' in sequence['protein']) and 'templates' in sequence['protein']:
                     # If both unpairedMsa (or unpairedMsaPath) and templates are provided, use them and maybe set pairedMsa
                     pass
+                elif run_mmseqs:
+                    # If we don't have unpairedMsa and templates and we want them, then use MMseqs
+                    # to generate them
+                    output_dir = os.path.join(output_dir, raw_json["name"].lower())
+                    a3m_path, template_dir = run_mmseqs2(
+                        os.path.join(output_dir, f'mmseqs_{raw_json["name"]}_{sequence["protein"]["id"][0]}'),
+                        sequence['protein']['sequence'],
+                        use_templates=True
+                    )
+                    if 'unpairedMsa' not in sequence['protein'] and 'unpairedMsaPath' not in sequence['protein']:
+                        set_if_absent(sequence['protein'], 'unpairedMsa', a3m_path)
+                    set_if_absent(sequence['protein'], 'templates', [] if template_dir is None else template_dir)
                 else:
                     # Set empty values.
                     set_if_absent(sequence['protein'], 'unpairedMsa', '')
@@ -446,7 +458,6 @@ def set_json_defaults(json_str: str, run_mmseqs: bool = False, output_dir: str =
                 set_if_absent(sequence['protein'], 'pairedMsa', '')
             elif 'rna' in sequence:
                 set_if_absent(sequence['rna'], 'unpairedMsa', '')
-    
     return raw_json
 
 
@@ -881,6 +892,9 @@ def get_custom_template_hits(
     # If the MSA is empty, make sure it at least has the query sequence.
     if unpaired_msa == "":
         unpaired_msa = f">query\n{query_seq}"
+
+#    with open('unpaired_msa.txt', 'w') as f:
+#        f.write(''.join(unpaired_msa))
                 
     # Reformat the unpaired_msa so that the descriptions have no spaces in them
     unpaired_msa_lines = unpaired_msa.splitlines()
