@@ -846,7 +846,9 @@ def get_polymer_features(
     raise ValueError('The structure must have a name.')
 
   if chain.release_date is None:
-    raise ValueError('The structure must have a release date.')
+#    raise ValueError('The structure must have a release date.')
+     print("Setting release date to 1900-01-01")
+     chain.release_data = "1900-01-01"
 
   auth_chain_id, label_chain_id = next(
       iter(chain.polymer_auth_asym_id_to_label_asym_id().items())
@@ -873,7 +875,8 @@ def get_polymer_features(
   template_sequence = ''.join(template_sequence)
   template_aatype = _encode_restype(chain_poly_type, template_sequence)
   template_name = f'{chain.name.lower()}_{auth_chain_id}'
-  release_date = chain.release_date.strftime('%Y-%m-%d')
+#  release_date = chain.release_date.strftime('%Y-%m-%d')
+  release_date = chain.release_date.strftime('%Y-%m-%d') if getattr(chain, 'release_date', None) is not None else '1900-01-01'
   return {
       'template_all_atom_positions': template_all_atom_positions,
       'template_all_atom_masks': template_all_atom_masks,
