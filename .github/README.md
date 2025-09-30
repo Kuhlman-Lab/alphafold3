@@ -71,6 +71,9 @@ your prediction has completed! You'll find the predicted structures (`*.cif`) an
 
 For more complicated inputs and examples, please refer to the [input format documentation](../docs/input.md) and the `examples` folder.
 
+## Additional Features
+
+This repo also includes an AF3 implementation of actifpTM, a refined confidence metric for predictions involving flexible regions. It can be found in the `_summary_confidences.json` output files. If actifpTM proves useful to you, please cite the appropriate paper: [Varga et al., Bioinformatics, 2025](https://academic.oup.com/bioinformatics/article/41/3/btaf107/8075121).
 
 ## Have suggestions or want to contribute?
 
