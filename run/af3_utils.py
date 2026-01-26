@@ -149,6 +149,22 @@ def get_af3_parser() -> FileArgumentParser:
         " AlphaFold 3 will use the seeds as provided in the input JSON."
     )
     
+    # Early stopping arguments.
+    parser.add_argument(
+        "--early_stop_metric",
+        type=str,
+        default=None,
+        help="Metric to use for early stopping and ranking (e.g., 'actifptm', 'ranking_score'). "
+        "If set, this metric is also used for selecting the best result."
+    )
+    parser.add_argument(
+        "--early_stop_threshold",
+        type=float,
+        default=None,
+        help="Stop processing seeds when any sample achieves score >= this threshold. "
+        "Requires --early_stop_metric to be set."
+    )
+    
     # Control which stages to run.
     parser.add_argument(
         "--run_inference",
@@ -276,6 +292,8 @@ def get_af3_args(arg_file: Optional[str] = None) -> Dict[str, Any]:
     if args.num_seeds is not None:
         if args.num_seeds < 1:
             raise ValueError("--num_seeds must be greater than or equal to 1.")
+    if args.early_stop_threshold is not None and args.early_stop_metric is None:
+        raise ValueError("--early_stop_threshold requires --early_stop_metric to be set.")
     
     return vars(args)
 
