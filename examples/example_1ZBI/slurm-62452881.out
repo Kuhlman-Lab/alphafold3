@@ -1,0 +1,36 @@
+
+Due to MODULEPATH changes, the following have been reloaded:
+  1) ucc-cuda/1.2.0     2) ucx-cuda/1.14.1
+
+The following have been reloaded with a version change:
+  1) cuda/12.6 => cuda/12.2                   3) nccl/2.26.2 => nccl/2.18.3
+  2) cudacore/.12.6.2 => cudacore/.12.2.2
+
+
+Running AlphaFold 3. Please note that standard AlphaFold 3 model parameters are
+only available under terms of use provided at
+https://github.com/google-deepmind/alphafold3/blob/main/WEIGHTS_TERMS_OF_USE.md.
+If you do not agree to these terms and are using AlphaFold 3 derived model
+parameters, cancel execution of AlphaFold 3 inference with CTRL-C, and do not
+use the model parameters.
+
+Found local devices: [CudaDevice(id=0)], using device 0: cuda:0
+Building model from scratch...
+Checking that model parameters can be loaded...
+Traceback (most recent call last):
+  File "/project/def-bkuhlman/group_files/alphafold3/run/run_af3.py", line 683, in <module>
+    main(args_dict)
+  File "/project/def-bkuhlman/group_files/alphafold3/run/run_af3.py", line 654, in main
+    for fold_input in fold_inputs:
+  File "/project/6119649/group_files/alphafold3/run/af3_utils.py", line 530, in load_fold_inputs_from_path
+    raw_json = set_json_defaults(json_str, run_mmseqs, output_dir, max_template_date, msa_mode, pairing_strategy)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/project/6119649/group_files/alphafold3/run/af3_utils.py", line 455, in set_json_defaults
+    template_hits = get_custom_template_hits(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/project/6119649/group_files/alphafold3/run/af3_utils.py", line 916, in get_custom_template_hits
+    hmmsearch_binary_path=os.path.join(os.environ["CONDA_PREFIX"], "bin", "hmmsearch"),
+                                       ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "<frozen os>", line 679, in __getitem__
+KeyError: 'CONDA_PREFIX'
+The job took 59 seconds to complete.

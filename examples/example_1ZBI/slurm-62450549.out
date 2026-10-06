@@ -1,0 +1,56 @@
+
+Due to MODULEPATH changes, the following have been reloaded:
+  1) ucc-cuda/1.2.0     2) ucx-cuda/1.14.1
+
+The following have been reloaded with a version change:
+  1) cuda/12.6 => cuda/12.2                   3) nccl/2.26.2 => nccl/2.18.3
+  2) cudacore/.12.6.2 => cudacore/.12.2.2
+
+[13:03:23] UFFTYPER: Warning: hybridization set to SP3 for atom 0
+[13:03:23] UFFTYPER: Unrecognized charge state for atom: 0
+[13:03:23] UFFTYPER: Warning: hybridization set to SP3 for atom 0
+[13:03:23] UFFTYPER: Unrecognized charge state for atom: 0
+[13:03:23] UFFTYPER: Warning: hybridization set to SP3 for atom 0
+[13:03:23] UFFTYPER: Unrecognized charge state for atom: 0
+[13:03:23] UFFTYPER: Warning: hybridization set to SP3 for atom 0
+[13:03:23] UFFTYPER: Unrecognized charge state for atom: 0
+[13:03:25] UFFTYPER: Warning: hybridization set to SP3 for atom 0
+[13:03:25] UFFTYPER: Unrecognized charge state for atom: 0
+[13:03:25] UFFTYPER: Warning: hybridization set to SP3 for atom 0
+[13:03:25] UFFTYPER: Unrecognized charge state for atom: 0
+[13:03:25] UFFTYPER: Warning: hybridization set to SP3 for atom 0
+[13:03:25] UFFTYPER: Unrecognized charge state for atom: 0
+[13:03:25] UFFTYPER: Warning: hybridization set to SP3 for atom 0
+[13:03:25] UFFTYPER: Unrecognized charge state for atom: 0
+
+Running AlphaFold 3. Please note that standard AlphaFold 3 model parameters are
+only available under terms of use provided at
+https://github.com/google-deepmind/alphafold3/blob/main/WEIGHTS_TERMS_OF_USE.md.
+If you do not agree to these terms and are using AlphaFold 3 derived model
+parameters, cancel execution of AlphaFold 3 inference with CTRL-C, and do not
+use the model parameters.
+
+Found local devices: [CudaDevice(id=0)], using device 0: cuda:0
+Building model from scratch...
+Checking that model parameters can be loaded...
+
+Running fold job 1ZBI...
+Output will be written in ./af3_preds_singleseq/1zbi_20261001_130317 since ./af3_preds_singleseq/1zbi is non-empty.
+Skipping data pipeline...
+Writing model input JSON to ./af3_preds_singleseq/1zbi_20261001_130317/1zbi_data.json.
+Predicting 3D structure for 1ZBI with 1 seed(s)...
+Featurising data with 1 seed(s)...
+Featurising data with seed 1.
+Featurising data with seed 1 took 3.18 seconds.
+Featurising data with 1 seed(s) took 8.10 seconds.
+Running model inference and extracting output structure samples with 1 seed(s)...
+Running model inference with seed 1...
+Running model inference with seed 1 took 73.58 seconds.
+Extracting inference results with seed 1...
+Extracting 5 inference samples withseed 1 took 0.44 seconds.
+Running model inference and extracting output structures with 1 seed(s) took 74.02 seconds.
+Writing outputs with 1 seed(s)...
+Fold job 1ZBI done, output written to ./af3_preds_singleseq/1zbi_20261001_130317.
+
+Done running 1 fold jobs.
+The job took 176 seconds to complete.

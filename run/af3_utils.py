@@ -9,6 +9,7 @@ import pathlib
 import logging
 import requests
 import itertools
+import shutil
 from alphafold3.common.folding_input import Input, Template
 from alphafold3.data import templates, structure_stores, msa_config
 from alphafold3.structure import from_mmcif
@@ -913,8 +914,8 @@ def get_custom_template_hits(
         max_template_date=datetime.date.fromisoformat(max_template_date),
         database_path=db_file,
         hmmsearch_config=msa_config.HmmsearchConfig(
-            hmmsearch_binary_path=os.path.join(os.environ["CONDA_PREFIX"], "bin", "hmmsearch"),
-            hmmbuild_binary_path=os.path.join(os.environ["CONDA_PREFIX"], "bin", "hmmbuild"),
+            hmmsearch_binary_path=shutil.which("hmmsearch"),
+            hmmbuild_binary_path=shutil.which("hmmbuild"),
             filter_f1=0.1,
             filter_f2=0.1,
             filter_f3=0.1,
