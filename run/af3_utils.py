@@ -46,7 +46,23 @@ class FileArgumentParser(argparse.ArgumentParser):
         # Return just flag if there is no value.
         else:
             return split_line
-        
+
+def read_flags_file_to_dict(path):
+    # Reads a flag file and returns a dictionary of flags.
+    # Each line in the file should contain a flag and its value. '--flag value'.
+    # Bare flags (without a value) are interpreted as True.
+    # Lines starting with '#' are treated as comments and ignored.
+    flags = {}
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue  # skip blank lines and comments
+            parts = line.split(maxsplit=1)
+            key = parts[0].lstrip("-")
+            value = parts[1] if len(parts) > 1 else True  # bare flag -> True
+            flags[key] = value
+    return flags       
 
 def binary_to_bool(i: int) -> bool:
     if i != 0 and i != 1:
