@@ -10,7 +10,7 @@ import jax
 from alphafold3.jax.attention import attention
 from alphafold3.model.post_processing import post_process_inference_result
 
-from af3_utils import load_fold_inputs_from_path, get_af3_args
+from af3_utils import load_fold_inputs_from_path, get_af3_args, read_flags_file_to_dict
 from run_af3 import ModelRunner, make_model_config, predict_structure
 
 
@@ -20,6 +20,8 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
     os.environ["XLA_FLAGS"] = "--xla_gpu_enable_triton_gemm=false"
     
     args_dict = get_af3_args(arg_file)
+    af3_input_flags = read_flags_file_to_dict(arg_file)
+    print(f"initializing AF3 with input dict {args_dict}")
 
     if args_dict['jax_compilation_cache_dir'] is not None:
         jax.config.update(
@@ -67,13 +69,20 @@ def init_af3(proc_id: int, arg_file: str, lengths: Sequence[Union[int, Sequence[
         print('\n' + '\n'.join(notice) + '\n')
 
     devices = jax.local_devices(backend='gpu')
+
+    # change number of recycles based on input
+    if "num_recycles" in af3_input_flags:
+        n_recycles = int(af3_input_flags["num_recycles"])
+    else:
+        n_recycles = 1
+
     model_runner = ModelRunner(
         config=make_model_config(
             flash_attention_implementation=typing.cast(
                 attention.Implementation, args_dict["flash_attention_implementation"]
             ),
             num_diffusion_samples=1, # To reduce time
-            num_recycles=1, # To reduce time
+            num_recycles=n_recycles, # To reduce time
         ),
         device=devices[args_dict["gpu_device"]],
         model_dir=pathlib.Path(args_dict["model_dir"]),
